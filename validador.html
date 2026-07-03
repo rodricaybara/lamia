@@ -851,15 +851,22 @@ function renderPaso1() {
 }
 
 function renderResumenPaso1() {
-  const a = STATE.personas.filter(p => isUPV(p.universidad));
-  const b = STATE.personas.filter(p => !isUPV(p.universidad));
+  // Usa getBloquesPropuesta para que en Acuerdo 2024 los bloques se determinen
+  // por número de orden (1-8 / 9-17) y no por universidad (art. 12.1 y art. 13).
+  const { bloqueA: a, bloqueB: b } = getBloquesPropuesta(STATE.personas, STATE.tipoPlaza);
   const mujeres = STATE.personas.filter(p => p.sexo === 'MUJER').length;
   const hombres = STATE.personas.filter(p => p.sexo === 'HOMBRE').length;
+  const upvEnA = a.filter(p => isUPV(p.universidad)).length;
   const biling = a.filter(p => isBilingue(p.perfil)).length;
+  // En Acuerdo 2024 el Bloque A puede mezclar UPV/EHU y externos, por lo que
+  // mostramos las personas UPV/EHU reales dentro del Bloque A como subcontador.
+  const labelA = STATE.tipoPlaza === 'acuerdo2024'
+    ? `Bloque A (nº 1–8) · ${upvEnA} UPV/EHU`
+    : 'Bloque A (UPV/EHU)';
   return `
   <div class="summary-grid">
-    <div class="summary-cell"><div class="label">Bloque A (UPV/EHU)</div><div class="value">${a.length}</div></div>
-    <div class="summary-cell"><div class="label">Bloque B (externos)</div><div class="value">${b.length}</div></div>
+    <div class="summary-cell"><div class="label">${labelA}</div><div class="value">${a.length}</div></div>
+    <div class="summary-cell"><div class="label">Bloque B (nº 9–17)</div><div class="value">${b.length}</div></div>
     <div class="summary-cell"><div class="label">Mujeres / Hombres</div><div class="value">${mujeres} / ${hombres}</div></div>
     <div class="summary-cell"><div class="label">Biling./Triling. (Bloque A)</div><div class="value">${biling} / ${a.length}</div></div>
   </div>`;
