@@ -454,7 +454,11 @@ function elegePareja(pool, requiereBilingueEnPrimera, segundoNoUPV) {
   pool = pool.slice();
   let primera;
   if (requiereBilingueEnPrimera) {
+    // Caso bilingüe: primera persona UPV/EHU con capacidad bilingüe/trilingüe (art. 13.2.1.a.1)
     primera = pool.find(p => isBilingue(p.perfil)) || pool[0] || null;
+  } else if (segundoNoUPV) {
+    // Caso Acuerdo 2024 no bilingüe: primera persona debe ser de la UPV/EHU (art. 13.2.2.a.1)
+    primera = pool.find(p => isUPV(p.universidad)) || pool[0] || null;
   } else {
     primera = pool[0] || null;
   }
