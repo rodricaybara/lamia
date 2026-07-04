@@ -661,8 +661,15 @@ function validarPropuesta() {
     `Se han detectado ${personas.length} filas y la numeración no es 1–17 consecutiva sin duplicados.`,
     'Revisa el Excel de origen: cada fila debe tener un número de orden único de 1 a 17.');
 
-  const bloqueA = personas.filter(p => isUPV(p.universidad));
-  const bloqueB = personas.filter(p => !isUPV(p.universidad));
+  // Bug corregido: antes se calculaba bloqueA/bloqueB siempre por isUPV(), lo cual es correcto
+  // para Ayudante Doctor (el Bloque A es, por definición, "los de la UPV/EHU") pero INCORRECTO
+  // para Acuerdo 2024, donde el Bloque A se define por posición (nº 1-8) y el art. 12.1.A
+  // permite explícitamente completarlo con personal externo si no hay 8 UPV/EHU disponibles.
+  // Con isUPV(), a esas personas externas "coladas" en el Bloque A se las contaba como Bloque B,
+  // descuadrando el tamaño, la paridad de género y el umbral de bilingüismo. getBloquesPropuesta
+  // ya resolvía esto correctamente para el resumen del Paso 1; aquí se reutiliza la misma función
+  // en vez de mantener una segunda definición inconsistente.
+  const { bloqueA, bloqueB } = getBloquesPropuesta(personas, STATE.tipoPlaza);
 
   if (reglamento.bloqueAExclusivoUPV) {
     if (bloqueA.length === 8 && bloqueB.length === 9) {
@@ -675,7 +682,9 @@ function validarPropuesta() {
   } else {
     if (personas.length === 17 && bloqueB.length === 9) {
       addOk(`Tamaño de la propuesta: 17 personas totales, 9 externas en Bloque B (correcto).`);
-      const upvEnA = bloqueA.length;
+      // upvEnA cuenta cuántas de las (hasta 8) personas del Bloque A son realmente UPV/EHU,
+      // no el tamaño del bloque en sí (que ahora es posicional y vale 8 salvo error de tamaño).
+      const upvEnA = bloqueA.filter(p => isUPV(p.universidad)).length;
       if (bilingueReq) {
         if (upvEnA >= 2) addOk(`Bloque A: ${upvEnA} personas de la UPV/EHU (mínimo 2 exigido para completar con externos si fuera necesario).`);
         else addIssue('upv-min', 'error', 'Insuficientes miembros UPV/EHU', 'art. 12.1.A',
