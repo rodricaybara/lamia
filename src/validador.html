@@ -189,8 +189,8 @@ const REGLAMENTOS = {
     bloqueASize: 8, bloqueBSize: 9,
     bloqueAExclusivoUPV: false,
     subcategorias: {
-      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRÁTICO', 'CATEDRATICO'], enabled: true },
-      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRÁTICO', 'CATEDRATICO', 'PLENO'], enabled: true },
+      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATICO'], enabled: true },
+      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATICO', 'PLENO'], enabled: true },
       titular:     { label: 'Titular',        categoriasPermitidas: null, enabled: false },
       agregado:    { label: 'Agregado',       categoriasPermitidas: null, enabled: false },
     },
@@ -198,7 +198,7 @@ const REGLAMENTOS = {
 };
 
 // Categorías admitidas en Bloque B (externos) para Ayudante Doctor: art. 3.1.b
-const CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR = ['CATEDRÁTICO', 'CATEDRATICO', 'TITULAR'];
+const CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR = ['CATEDRATICO', 'TITULAR'];
 
 /* ==========================================================================
    ESTADO GLOBAL
@@ -415,14 +415,32 @@ function normalizarTexto(txt) {
     .trim();
 }
 function esCategoria(p, claves) {
-  const c = normalizarTexto(p.categoria);
-  return claves.some(k => c.includes(k));
+  return claves.includes(normalizarCategoria(p.categoria));
 }
 function esCatedratico(p) {
   return esCategoria(p, ['CATEDRATICO']);
 }
 function esPleno(p) {
   return esCategoria(p, ['PLENO']);
+}
+// Normaliza el texto de "Cuerpo-Categoría" del Excel a un código canónico
+// (CATEDRATICO / TITULAR / PLENO / AGREGADO), reconociendo:
+// - variantes de género: Catedrático/Catedrática, Titular, Agregado/Agregada...
+// - la forma larga: "Catedrático/a de Universidad", "Titular de Universidad"...
+// - abreviaturas habituales de la administración universitaria: CU (Catedrático/a
+//   de Universidad), TU (Titular de Universidad).
+// Si no reconoce la categoría, devuelve el texto normalizado tal cual, para que
+// la validación la marque como no válida en vez de dejarla pasar por error.
+function normalizarCategoria(categoriaTexto) {
+  const c = normalizarTexto(String(categoriaTexto || '').replace(/\./g, ''));
+  const palabras = c.split(' ');
+  const esAbreviatura = (abrev) => palabras.includes(abrev);
+
+  if (c.includes('CATEDRATIC') || esAbreviatura('CU')) return 'CATEDRATICO';
+  if (c.includes('AGREGAD')) return 'AGREGADO';
+  if (c.includes('PLEN')) return 'PLENO';
+  if (c.includes('TITULAR') || esAbreviatura('TU')) return 'TITULAR';
+  return c;
 }
 function getBloquesPropuesta(personas, tipoPlaza) {
   if (tipoPlaza === 'acuerdo2024') {
@@ -476,41 +494,64 @@ function elegePareja(pool, requiereBilingueEnPrimera, segundoNoUPV) {
   return { pareja: [primera], restante: pool };
 }
 
-function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza) {
-  let pool = listaReordenada.filter(p => isUPV(p.universidad));
+// Régimen general de emparejamiento del Bloque A: art. 4.2 (Ayudante Doctor)
+// y art. 13.2.1 (Acuerdo 2024 — Catedrático siempre, y Pleno cuando la plaza es bilingüe).
+// La segunda persona de cada pareja NO tiene restricción de procedencia (puede ser UPV/EHU o no).
+function bloqueA_RegimenGeneral(poolBloqueA, bilingue, reglaA, reglaB, traza) {
+  let pool = poolBloqueA.slice();
   const r1 = elegePareja(pool, bilingue, false);
-  traza.push({ bloque: 'A', regla: 'art. 4.2.a', texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
+  traza.push({ bloque: 'A', regla: reglaA, texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
   let suplentes = [];
   let poolN = r1.restante;
   for (let i = 0; i < 2; i++) {
     const rn = elegePareja(poolN, bilingue, false);
-    traza.push({ bloque: 'A', regla: 'art. 4.2.b', texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
+    traza.push({ bloque: 'A', regla: reglaB, texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
     suplentes = suplentes.concat(rn.pareja);
     poolN = rn.restante;
   }
   return { titulares: r1.pareja, suplentes };
 }
 
-function bloqueA_Acuerdo2024(listaReordenada, bilingue, traza) {
-  if (bilingue) {
-    return bloqueA_AyudanteDoctor(listaReordenada, true, traza);
-  }
-  let pool = listaReordenada.slice();
+// Régimen específico del Bloque A: art. 13.2.2 (Acuerdo 2024 — exclusivo de Pleno/Agregado no bilingüe).
+// Aquí la segunda persona de cada pareja debe ser, además de género distinto, externa a la UPV/EHU.
+// Esta restricción es la que garantiza que la comisión final no supere el máximo de 2 UPV/EHU (art. 11.5).
+function bloqueA_RegimenSegundaNoUPV(poolBloqueA, reglaA, reglaB, traza) {
+  let pool = poolBloqueA.slice();
   const r1 = elegePareja(pool, false, true);
-  traza.push({ bloque: 'A', regla: 'art. 13.2.2.a', texto: describePareja(r1.pareja, false, true, 'Pareja titular') });
+  traza.push({ bloque: 'A', regla: reglaA, texto: describePareja(r1.pareja, false, true, 'Pareja titular') });
   let suplentes = [];
   let poolN = r1.restante;
   for (let i = 0; i < 2; i++) {
     const rn = elegePareja(poolN, false, true);
-    traza.push({ bloque: 'A', regla: 'art. 13.2.2.b', texto: describePareja(rn.pareja, false, true, `${i + 1}ª pareja suplente`) });
+    traza.push({ bloque: 'A', regla: reglaB, texto: describePareja(rn.pareja, false, true, `${i + 1}ª pareja suplente`) });
     suplentes = suplentes.concat(rn.pareja);
     poolN = rn.restante;
   }
   return { titulares: r1.pareja, suplentes };
 }
 
-function bloqueB_alternando(listaReordenada, nTotal, reglaRef, traza) {
-  const externos = listaReordenada.filter(p => !isUPV(p.universidad));
+function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza) {
+  // Ayudante Doctor: el Bloque A es siempre UPV/EHU (sin excepción de completar con externos
+  // documentada en el reglamento), por lo que filtrar por universidad equivale a filtrar por bloque.
+  const poolBloqueA = listaReordenada.filter(p => isUPV(p.universidad));
+  return bloqueA_RegimenGeneral(poolBloqueA, bilingue, 'art. 4.2.a', 'art. 4.2.b', traza);
+}
+
+function bloqueA_Acuerdo2024(listaReordenada, subcategoria, bilingue, traza) {
+  // Acuerdo 2024: el Bloque A se define por número de orden (1-8), no por universidad,
+  // porque el art. 12.1.A permite completarlo excepcionalmente con personal externo.
+  const poolBloqueA = listaReordenada.filter(p => p.numero >= 1 && p.numero <= 8);
+  // Catedrático: siempre régimen general (art. 13.2.1), sea o no bilingüe la plaza.
+  // Pleno: régimen general (13.2.1) si es bilingüe; régimen específico (13.2.2) si no lo es.
+  const usaRegimenGeneral = subcategoria === 'catedratico' || bilingue;
+  if (usaRegimenGeneral) {
+    return bloqueA_RegimenGeneral(poolBloqueA, bilingue, 'art. 13.2.1.a', 'art. 13.2.1.b', traza);
+  }
+  return bloqueA_RegimenSegundaNoUPV(poolBloqueA, 'art. 13.2.2.a', 'art. 13.2.2.b', traza);
+}
+
+function bloqueB_alternando(poolBloqueB, nTotal, reglaRef, traza) {
+  const externos = poolBloqueB.slice();
   const seleccion = [];
   let generoAnterior = null;
   while (seleccion.length < nTotal && seleccion.length < externos.length) {
@@ -553,11 +594,17 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
   const listaReordenada = reordenar(personas, ordenBolas);
   let a, b;
   if (tipoPlaza === 'ayudante_doctor') {
+    // Bloque B de Ayudante Doctor: externos a la UPV/EHU (el reglamento no prevé excepción
+    // de mezcla con el Bloque A, así que filtrar por universidad equivale a filtrar por bloque).
+    const poolBloqueB = listaReordenada.filter(p => !isUPV(p.universidad));
     a = bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza);
-    b = bloqueB_alternando(listaReordenada, 6, 'art. 4.3', traza);
+    b = bloqueB_alternando(poolBloqueB, 6, 'art. 4.3', traza);
   } else {
-    a = bloqueA_Acuerdo2024(listaReordenada, bilingue, traza);
-    b = bloqueB_alternando(listaReordenada, 6, 'art. 13.3.a', traza);
+    // Bloque B de Acuerdo 2024: se define por número de orden (9-17), igual que el Bloque A,
+    // para no arrastrar aquí a personas externas que hubiesen entrado por la excepción del art. 12.1.A.
+    const poolBloqueB = listaReordenada.filter(p => p.numero >= 9 && p.numero <= 17);
+    a = bloqueA_Acuerdo2024(listaReordenada, subcategoria, bilingue, traza);
+    b = bloqueB_alternando(poolBloqueB, 6, 'art. 13.3.a', traza);
   }
   return {
     listaReordenada,
@@ -674,7 +721,7 @@ function validarPropuesta() {
   }
 
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const noValidos = bloqueB.filter(p => !CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR.includes(p.categoria));
+    const noValidos = bloqueB.filter(p => !CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR.includes(normalizarCategoria(p.categoria)));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
@@ -682,7 +729,7 @@ function validarPropuesta() {
   } else {
     const sub = REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria];
     const permitidas = sub.categoriasPermitidas;
-    const noValidos = personas.filter(p => !permitidas.includes(p.categoria));
+    const noValidos = personas.filter(p => !permitidas.includes(normalizarCategoria(p.categoria)));
     if (noValidos.length === 0) addOk(`Categorías: todas las personas cumplen la categoría exigida para plaza de ${sub.label} (${permitidas.join('/')}).`);
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 12.4',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${permitidas.join(' o ')}).`,
