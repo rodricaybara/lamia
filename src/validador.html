@@ -188,33 +188,23 @@ const REGLAMENTOS = {
     fuente: 'Reglamento 26/09/2024',
     bloqueASize: 8, bloqueBSize: 9,
     bloqueAExclusivoUPV: false,
-    // categoriasPermitidas: claves SIN acentos (se comparan con esCategoria/normalizarTexto,
-    // que ya elimina los acentos de la categoría leída del Excel).
-    // reglaBloqueANoBilingue: 'general' (art. 13.2.1, aplica siempre a Catedrático) |
-    //                         'especifica' (art. 13.2.2, solo Pleno/Agregado no bilingüe).
-    // umbralBilingueBloqueA: número mínimo de personas bilingües en Bloque A (art. 12.1.A) |
-    //                        'todos' si se exige el 100 % (art. 12.2, solo Pleno/Agregado).
-    // rangoUPVBloqueANoBilingue: {min,max} si existe límite específico (art. 12.3, solo Pleno/Agregado);
-    //                            null si aplica la regla general (8 de la UPV/EHU, mínimo 2 si hay que completar, art. 12.1.A).
     subcategorias: {
-      catedratico: {
-        label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATICO'], enabled: true,
-        reglaBloqueANoBilingue: 'general', umbralBilingueBloqueA: 5, rangoUPVBloqueANoBilingue: null,
-      },
-      pleno: {
-        label: 'Pleno', categoriasPermitidas: ['CATEDRATICO', 'PLENO'], enabled: true,
-        reglaBloqueANoBilingue: 'especifica', umbralBilingueBloqueA: 'todos', rangoUPVBloqueANoBilingue: { min: 2, max: 4 },
-      },
-      titular:     { label: 'Titular',        categoriasPermitidas: null, enabled: false },
-      agregado:    { label: 'Agregado',       categoriasPermitidas: null, enabled: false },
+      // categoriasPermitidas usa raíces léxicas (normalizadas sin acentos), no la
+      // palabra completa: en los Excel reales la categoría llega con variantes de
+      // género/prefijo como "Profesor Catedratico" o "Profesora Catedratica", y
+      // una clave como "CATEDRATICO" no reconoce la forma femenina "CATEDRATICA"
+      // por subcadena (difieren en la última letra). Con la raíz "CATEDRATIC" se
+      // cubren ambas formas.
+      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a de Universidad', enabled: true },
+      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a de Universidad o Profesorado Pleno', enabled: true },
+      titular:     { label: 'Titular',        categoriasPermitidas: null, categoriasLabel: null, enabled: false },
+      agregado:    { label: 'Agregado',       categoriasPermitidas: null, categoriasLabel: null, enabled: false },
     },
   },
 };
 
 // Categorías admitidas en Bloque B (externos) para Ayudante Doctor: art. 3.1.b
-// Claves de CATEGORIA_DEFINICIONES, no cadenas literales: cubren género, plural,
-// abreviaturas (CU/TU) y el término en euskera de Catedrático (Katedradun).
-const CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR = ['CATEDRATICO', 'TITULAR'];
+const CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR = ['CATEDRÁTICO', 'CATEDRATICO', 'TITULAR'];
 
 /* ==========================================================================
    ESTADO GLOBAL
@@ -423,18 +413,6 @@ function maskDNI(dni) {
 function nombreCompleto(p) {
   return [p.nombre, p.apellido1, p.apellido2].filter(Boolean).join(' ');
 }
-// Definición de cada categoría académica como conjunto de "raíces" (se comparan por
-// subcadena sobre el texto normalizado, cubren género y plural sin listar cada variante:
-// CATEDRATIC cubre Catedrático/Catedrática/Catedráticos/Catedráticas; KATEDRADUN cubre el
-// término en euskera Katedradun/a/ak) y "siglas" (se comparan por palabra completa, no por
-// subcadena, porque una sigla de 2 letras como CU o TU podría dar falso positivo si apareciera
-// dentro de otra palabra).
-const CATEGORIA_DEFINICIONES = {
-  CATEDRATICO: { raices: ['CATEDRATIC', 'KATEDRADUN'], siglas: ['CU'] },
-  TITULAR:     { raices: ['TITULAR'], siglas: ['TU'] },
-  PLENO:       { raices: ['PLEN'], siglas: [] },
-  AGREGADO:    { raices: ['AGREGAD'], siglas: [] },
-};
 function normalizarTexto(txt) {
   return String(txt || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -442,26 +420,15 @@ function normalizarTexto(txt) {
     .replace(/[^A-Z0-9]+/g, ' ')
     .trim();
 }
-function categoriaCoincideTipo(p, tipo) {
-  const def = CATEGORIA_DEFINICIONES[tipo];
-  if (!def) return false;
+function esCategoria(p, claves) {
   const c = normalizarTexto(p.categoria);
-  if (def.raices.some(r => c.includes(r))) return true;
-  if (def.siglas.length) {
-    const palabras = c.split(' ').filter(Boolean);
-    if (def.siglas.some(s => palabras.includes(s))) return true;
-  }
-  return false;
-}
-// tipos: array de claves de CATEGORIA_DEFINICIONES (p.ej. ['CATEDRATICO'] o ['CATEDRATICO','PLENO']).
-function esCategoria(p, tipos) {
-  return tipos.some(tipo => categoriaCoincideTipo(p, tipo));
+  return claves.some(k => c.includes(k));
 }
 function esCatedratico(p) {
-  return categoriaCoincideTipo(p, 'CATEDRATICO');
+  return esCategoria(p, ['CATEDRATIC']);
 }
 function esPleno(p) {
-  return categoriaCoincideTipo(p, 'PLENO');
+  return esCategoria(p, ['PLEN']);
 }
 function getBloquesPropuesta(personas, tipoPlaza) {
   if (tipoPlaza === 'acuerdo2024') {
@@ -515,41 +482,25 @@ function elegePareja(pool, requiereBilingueEnPrimera, segundoNoUPV) {
   return { pareja: [primera], restante: pool };
 }
 
-// reglaPareja/reglaSuplente son parametrizables porque esta misma mecánica (art. 4.2 en
-// Ayudante Doctor) es también la regla general del art. 13.2.1 en Acuerdo 2024 (Catedrático,
-// y Pleno/Agregado cuando la plaza es bilingüe). Citar siempre el artículo correcto según
-// quién llama, en vez de dejar fijo el de Ayudante Doctor.
-function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza, reglaPareja = 'art. 4.2.a', reglaSuplente = 'art. 4.2.b') {
+function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza) {
   let pool = listaReordenada.filter(p => isUPV(p.universidad));
   const r1 = elegePareja(pool, bilingue, false);
-  traza.push({ bloque: 'A', regla: reglaPareja, texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
+  traza.push({ bloque: 'A', regla: 'art. 4.2.a', texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
   let suplentes = [];
   let poolN = r1.restante;
   for (let i = 0; i < 2; i++) {
     const rn = elegePareja(poolN, bilingue, false);
-    traza.push({ bloque: 'A', regla: reglaSuplente, texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
+    traza.push({ bloque: 'A', regla: 'art. 4.2.b', texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
     suplentes = suplentes.concat(rn.pareja);
     poolN = rn.restante;
   }
   return { titulares: r1.pareja, suplentes };
 }
 
-// subConfig: entrada de REGLAMENTOS.acuerdo2024.subcategorias[subcategoria].
-// - Si la plaza es bilingüe, rige siempre el régimen general art. 13.2.1 (igual para
-//   Catedrático que para Pleno/Agregado): primera persona UPV/EHU con euskera + pareja
-//   de género distinto sin restricción de procedencia.
-// - Si NO es bilingüe, la rama depende de subConfig.reglaBloqueANoBilingue:
-//     'general'   → Catedrático: art. 13.2.1 igualmente (sin el requisito de euskera).
-//     'especifica'→ Pleno/Agregado: art. 13.2.2 (pareja UPV/EHU + persona externa de género distinto).
-function bloqueA_Acuerdo2024(listaReordenada, bilingue, subConfig, traza) {
+function bloqueA_Acuerdo2024(listaReordenada, bilingue, traza) {
   if (bilingue) {
-    return bloqueA_AyudanteDoctor(listaReordenada, true, traza, 'art. 13.2.1.a', 'art. 13.2.1.b');
+    return bloqueA_AyudanteDoctor(listaReordenada, true, traza);
   }
-  if (!subConfig || subConfig.reglaBloqueANoBilingue !== 'especifica') {
-    // Catedrático (o config no reconocida, por seguridad se aplica el régimen general): art. 13.2.1.
-    return bloqueA_AyudanteDoctor(listaReordenada, false, traza, 'art. 13.2.1.a', 'art. 13.2.1.b');
-  }
-  // Pleno/Agregado no bilingüe: art. 13.2.2 (pareja UPV/EHU + persona externa).
   let pool = listaReordenada.slice();
   const r1 = elegePareja(pool, false, true);
   traza.push({ bloque: 'A', regla: 'art. 13.2.2.a', texto: describePareja(r1.pareja, false, true, 'Pareja titular') });
@@ -564,12 +515,8 @@ function bloqueA_Acuerdo2024(listaReordenada, bilingue, subConfig, traza) {
   return { titulares: r1.pareja, suplentes };
 }
 
-// excluir: personas ya asignadas al Bloque A (relevante solo en la rama art. 13.2.2, donde el
-// Bloque A puede tomar a alguien externo a la UPV/EHU; sin esta exclusión esa misma persona
-// podría volver a salir elegida aquí, duplicándola en la comisión).
-function bloqueB_alternando(listaReordenada, nTotal, reglaRef, traza, excluir = []) {
-  const excluirSet = new Set(excluir);
-  const externos = listaReordenada.filter(p => !isUPV(p.universidad) && !excluirSet.has(p));
+function bloqueB_alternando(listaReordenada, nTotal, reglaRef, traza) {
+  const externos = listaReordenada.filter(p => !isUPV(p.universidad));
   const seleccion = [];
   let generoAnterior = null;
   while (seleccion.length < nTotal && seleccion.length < externos.length) {
@@ -615,13 +562,8 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
     a = bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza);
     b = bloqueB_alternando(listaReordenada, 6, 'art. 4.3', traza);
   } else {
-    const subConfig = REGLAMENTOS.acuerdo2024.subcategorias[subcategoria];
-    a = bloqueA_Acuerdo2024(listaReordenada, bilingue, subConfig, traza);
-    // Bug de duplicación (art. 13.2.2): el Bloque A puede tomar a una persona externa a la
-    // UPV/EHU; se excluye explícitamente de la selección del Bloque B para que nadie ocupe
-    // dos puestos en la misma comisión.
-    const usadosEnA = [...a.titulares, ...a.suplentes];
-    b = bloqueB_alternando(listaReordenada, 6, 'art. 13.3.a', traza, usadosEnA);
+    a = bloqueA_Acuerdo2024(listaReordenada, bilingue, traza);
+    b = bloqueB_alternando(listaReordenada, 6, 'art. 13.3.a', traza);
   }
   return {
     listaReordenada,
@@ -643,10 +585,6 @@ function validarPropuesta() {
   const personas = STATE.personas;
   const reglamento = REGLAMENTOS[STATE.tipoPlaza];
   const bilingueReq = STATE.perfilLinguistico === 'bilingue';
-  // Parámetros específicos de la subcategoría (solo aplica a Acuerdo 2024): umbral de
-  // bilingüismo en Bloque A y rango UPV/EHU cuando la plaza no es bilingüe difieren entre
-  // Catedrático (art. 12.1.A) y Pleno/Agregado (arts. 12.2 y 12.3).
-  const subConfig = STATE.tipoPlaza === 'acuerdo2024' ? REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria] : null;
 
   let addIssue = (id, tipo, tag, ref, desc, sugerencia) => {
     issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '' });
@@ -661,14 +599,12 @@ function validarPropuesta() {
     `Se han detectado ${personas.length} filas y la numeración no es 1–17 consecutiva sin duplicados.`,
     'Revisa el Excel de origen: cada fila debe tener un número de orden único de 1 a 17.');
 
-  // Bug corregido: antes se calculaba bloqueA/bloqueB siempre por isUPV(), lo cual es correcto
-  // para Ayudante Doctor (el Bloque A es, por definición, "los de la UPV/EHU") pero INCORRECTO
-  // para Acuerdo 2024, donde el Bloque A se define por posición (nº 1-8) y el art. 12.1.A
-  // permite explícitamente completarlo con personal externo si no hay 8 UPV/EHU disponibles.
-  // Con isUPV(), a esas personas externas "coladas" en el Bloque A se las contaba como Bloque B,
-  // descuadrando el tamaño, la paridad de género y el umbral de bilingüismo. getBloquesPropuesta
-  // ya resolvía esto correctamente para el resumen del Paso 1; aquí se reutiliza la misma función
-  // en vez de mantener una segunda definición inconsistente.
+  // Bloque A/B: para Acuerdo 2024 se determinan por número de orden (1-8 / 9-17),
+  // conforme al art. 12.1, y no por afiliación institucional, ya que el art. 12.1.A
+  // permite completar el Bloque A con personal externo cuando no hay suficientes
+  // personas de la UPV/EHU. Para Ayudante Doctor, en cambio, el Bloque A es
+  // exclusivamente UPV/EHU por afiliación (getBloquesPropuesta lo resuelve para
+  // ambos casos de forma consistente con el resto de la aplicación).
   const { bloqueA, bloqueB } = getBloquesPropuesta(personas, STATE.tipoPlaza);
 
   if (reglamento.bloqueAExclusivoUPV) {
@@ -681,33 +617,28 @@ function validarPropuesta() {
     }
   } else {
     if (personas.length === 17 && bloqueB.length === 9) {
-      addOk(`Tamaño de la propuesta: 17 personas totales, 9 externas en Bloque B (correcto).`);
-      // upvEnA cuenta cuántas de las (hasta 8) personas del Bloque A son realmente UPV/EHU,
-      // no el tamaño del bloque en sí (que ahora es posicional y vale 8 salvo error de tamaño).
+      addOk(`Tamaño de la propuesta: 17 personas totales, 9 en el Bloque B (nº 9–17) (correcto).`);
       const upvEnA = bloqueA.filter(p => isUPV(p.universidad)).length;
+      const upvEnB = bloqueB.filter(p => isUPV(p.universidad)).length;
+      if (upvEnB > 0) {
+        addIssue('upv-en-b', 'error', 'Persona UPV/EHU en el Bloque B', 'art. 12.1.B',
+          `${upvEnB} persona(s) de la UPV/EHU figuran en el Bloque B (nº 9–17), que debe estar compuesto exclusivamente por personal externo.`,
+          'Sustituye a las personas de la UPV/EHU del Bloque B por personal externo, o corrige su numeración si su posición correcta es el Bloque A.');
+      }
       if (bilingueReq) {
         if (upvEnA >= 2) addOk(`Bloque A: ${upvEnA} personas de la UPV/EHU (mínimo 2 exigido para completar con externos si fuera necesario).`);
         else addIssue('upv-min', 'error', 'Insuficientes miembros UPV/EHU', 'art. 12.1.A',
           `Solo hay ${upvEnA} personas de la UPV/EHU en el Bloque A; se exige un mínimo de 2.`,
           'Añade personas de la UPV/EHU al Bloque A hasta alcanzar al menos 2.');
-      } else if (subConfig && subConfig.rangoUPVBloqueANoBilingue) {
-        // Regla específica de Pleno/Agregado no bilingüe (art. 12.3): rango cerrado.
-        const { min, max } = subConfig.rangoUPVBloqueANoBilingue;
-        if (upvEnA >= min && upvEnA <= max) addOk(`Bloque A (no bilingüe): ${upvEnA} personas de la UPV/EHU (rango ${min}–${max} exigido).`);
-        else addIssue('upv-rango', 'error', 'Proporción UPV/EHU fuera de rango', 'art. 12.3',
-          `En plaza no bilingüe de ${subConfig.label}, el Bloque A debe tener entre ${min} y ${max} personas de la UPV/EHU; se han detectado ${upvEnA}.`,
-          `Ajusta la propuesta para que el número de personas UPV/EHU en el Bloque A esté entre ${min} y ${max}.`);
       } else {
-        // Regla general (Catedrático, art. 12.1.A): con carácter general las 8 son de la
-        // UPV/EHU; solo se exige un mínimo de 2 si ha habido que completar con externos.
-        if (upvEnA >= 2) addOk(`Bloque A (no bilingüe): ${upvEnA} personas de la UPV/EHU (mínimo 2 exigido; con carácter general deberían ser las 8).`);
-        else addIssue('upv-min', 'error', 'Insuficientes miembros UPV/EHU', 'art. 12.1.A',
-          `Solo hay ${upvEnA} personas de la UPV/EHU en el Bloque A; se exige un mínimo de 2.`,
-          'Añade personas de la UPV/EHU al Bloque A hasta alcanzar al menos 2.');
+        if (upvEnA >= 2 && upvEnA <= 4) addOk(`Bloque A (no bilingüe): ${upvEnA} personas de la UPV/EHU (rango 2–4 exigido).`);
+        else addIssue('upv-rango', 'error', 'Proporción UPV/EHU fuera de rango', 'art. 12.3',
+          `En plaza no bilingüe, el Bloque A debe tener entre 2 y 4 personas de la UPV/EHU; se han detectado ${upvEnA}.`,
+          'Ajusta la propuesta para que el número de personas UPV/EHU en el Bloque A esté entre 2 y 4.');
       }
     } else {
       addIssue('tamano', 'error', 'Tamaño de bloques incorrecto', 'art. 12.1',
-        `Se esperaban 17 personas en total con 9 externas en el Bloque B; se han detectado ${personas.length} en total y ${bloqueB.length} externas.`,
+        `Se esperaban 17 personas en total con 9 en el Bloque B; se han detectado ${personas.length} en total y ${bloqueB.length} en el Bloque B.`,
         'Ajusta la propuesta para que cumpla la proporción exigida antes de continuar.');
     }
   }
@@ -751,24 +682,16 @@ function validarPropuesta() {
       else addIssue('bilingue-a', 'error', 'Capacidad bilingüe/trilingüe insuficiente', 'art. 3.1.a',
         `Solo ${bilinguesA} de ${bloqueA.length} personas del Bloque A tienen capacidad bilingüe/trilingüe; se exige un mínimo de 5.`,
         'Sustituye a alguna persona del Bloque A por otra con capacidad para impartir docencia en euskera.');
-    } else if (subConfig && subConfig.umbralBilingueBloqueA === 'todos') {
-      // Pleno/Agregado bilingüe (art. 12.2): TODAS las personas del Bloque A deben ser bilingües.
+    } else {
       if (bilinguesA === bloqueA.length && bloqueA.length > 0) addOk(`Capacidad bilingüe/trilingüe en Bloque A: ${bilinguesA} de ${bloqueA.length} (100% requerido para plaza bilingüe/trilingüe).`);
       else addIssue('bilingue-a', 'error', 'Capacidad bilingüe/trilingüe insuficiente', 'art. 12.2',
         `${bilinguesA} de ${bloqueA.length} personas del Bloque A tienen capacidad bilingüe/trilingüe; en este Reglamento se exige que TODAS las personas del Bloque A sean bilingües/trilingües.`,
         'Sustituye a las personas del Bloque A sin capacidad bilingüe/trilingüe por otras que sí la tengan.');
-    } else {
-      // Catedrático bilingüe (art. 12.1.A): basta con un mínimo de 5 de 8, igual que Ayudante Doctor.
-      const umbral = (subConfig && typeof subConfig.umbralBilingueBloqueA === 'number') ? subConfig.umbralBilingueBloqueA : 5;
-      if (bilinguesA >= umbral) addOk(`Capacidad bilingüe/trilingüe en Bloque A: ${bilinguesA} de ${bloqueA.length} (≥${umbral} requerido para plaza bilingüe/trilingüe).`);
-      else addIssue('bilingue-a', 'error', 'Capacidad bilingüe/trilingüe insuficiente', 'art. 12.1.A',
-        `Solo ${bilinguesA} de ${bloqueA.length} personas del Bloque A tienen capacidad bilingüe/trilingüe; se exige un mínimo de ${umbral}.`,
-        'Sustituye a alguna persona del Bloque A por otra con capacidad para impartir docencia en euskera.');
     }
   }
 
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const noValidos = bloqueB.filter(p => !esCategoria(p, CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR));
+    const noValidos = bloqueB.filter(p => !CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR.includes(p.categoria));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
@@ -776,13 +699,18 @@ function validarPropuesta() {
   } else {
     const sub = REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria];
     const permitidas = sub.categoriasPermitidas;
-    // Comparación por subcadena normalizada (igual que esCatedratico/esPleno), no por igualdad exacta:
-    // el Excel suele traer "Catedrático de Universidad" y no solo "Catedrático".
+    const etiquetaCategorias = sub.categoriasLabel || permitidas.join(' o ');
+    // Comparación por subcadena normalizada (sin acentos, mayúsculas) usando
+    // raíces léxicas en vez de igualdad exacta: en los Excel reales la categoría
+    // llega como "PROFESOR CATEDRATICO", "PROFESORA CATEDRATICA", "PROFESOR
+    // PLENO", etc., con el sustantivo y el género flexionados, no como la
+    // palabra clave aislada (ni siquiera "CATEDRATICO" reconoce por subcadena
+    // la forma femenina "CATEDRATICA", de ahí la raíz "CATEDRATIC").
     const noValidos = personas.filter(p => !esCategoria(p, permitidas));
-    if (noValidos.length === 0) addOk(`Categorías: todas las personas cumplen la categoría exigida para plaza de ${sub.label} (${permitidas.join('/')}).`);
+    if (noValidos.length === 0) addOk(`Categorías: todas las personas cumplen la categoría exigida para plaza de ${sub.label} (${etiquetaCategorias}).`);
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 12.4',
-      `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${permitidas.join(' o ')}).`,
-      `Sustituir por una persona con categoría ${permitidas.join(' o ')}.`));
+      `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${etiquetaCategorias}).`,
+      `Sustituir por una persona con categoría ${etiquetaCategorias}.`));
   }
 
   if (STATE.codigoPlazaExcel) {
@@ -1422,3 +1350,5 @@ function exportarActaPDF() {
 
 render();
 </script>
+</body>
+</html>
