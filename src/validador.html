@@ -442,6 +442,19 @@ function getBloquesPropuesta(personas, tipoPlaza) {
     bloqueB: personas.filter(p => !isUPV(p.universidad)),
   };
 }
+// Código de bloque para mostrar en tablas/actas ("UPV/EHU" o "EXT"). Se basa en
+// el BLOQUE de procedencia (posición 1-8 = Bloque A, 9-17 = Bloque B en Acuerdo
+// 2024), no en la afiliación individual: el art. 12.3 permite completar el
+// Bloque A con personal externo cuando no hay suficientes UPV/EHU, pero esa
+// persona sigue perteneciendo administrativamente al "bloque UPV/EHU" a
+// efectos del acta (así lo hace también la plantilla oficial). Para Ayudante
+// Doctor el Bloque A es exclusivamente UPV/EHU, así que coincide con isUPV().
+function codigoBloque(p, tipoPlaza) {
+  if (tipoPlaza === 'acuerdo2024') {
+    return (p.numero >= 1 && p.numero <= 8) ? 'UPV/EHU' : 'EXT';
+  }
+  return isUPV(p.universidad) ? 'UPV/EHU' : 'EXT';
+}
 function personasOrdenadasPorNumero(personas) {
   return personas.slice().sort((a, b) => a.numero - b.numero);
 }
@@ -559,11 +572,30 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
   const listaReordenada = reordenar(personas, ordenBolas);
   let a, b;
   if (tipoPlaza === 'ayudante_doctor') {
+    // art. 4.1: sorteo único combinado. Bloque A (UPV) y Bloque B (externos) se
+    // extraen de la MISMA lista reordenada mediante filtrado por afiliación;
+    // como en este reglamento el Bloque A es exclusivamente UPV/EHU, no hay
+    // solapamiento posible entre ambos filtrados.
     a = bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza);
     b = bloqueB_alternando(listaReordenada, 6, 'art. 4.3', traza);
   } else {
-    a = bloqueA_Acuerdo2024(listaReordenada, bilingue, traza);
-    b = bloqueB_alternando(listaReordenada, 6, 'art. 13.3.a', traza);
+    // art. 13.1: se realizan dos sorteos independientes, uno por bloque. En la
+    // práctica se hace un único sorteo de 17 bolas y se separan las listas
+    // reordenadas de cada bloque conservando el orden de extracción dentro de
+    // cada una (ver resumen_composicion_catedratico_no_bilingue.md, apdo. 2).
+    // Es imprescindible separar ambas listas ANTES de aplicar el algoritmo de
+    // cada bloque: si se le pasa a cada bloque la lista combinada de 17, el
+    // algoritmo del Bloque A puede alcanzar personas numeradas en el rango del
+    // Bloque B (9-17) —y viceversa—, y el Bloque B puede volver a seleccionar
+    // a alguien que el Bloque A ya usó, generando personas duplicadas en la
+    // composición final (bug detectado con la propuesta PLC8L1-D00166-2, Pleno
+    // no bilingüe: el Bloque A llegó a "pescar" a la persona nº16, que
+    // pertenece al Bloque B, y el Bloque B la volvió a seleccionar por su
+    // cuenta).
+    const listaReordenadaA = listaReordenada.filter(p => p.numero >= 1 && p.numero <= 8);
+    const listaReordenadaB = listaReordenada.filter(p => p.numero >= 9 && p.numero <= 17);
+    a = bloqueA_Acuerdo2024(listaReordenadaA, bilingue, traza);
+    b = bloqueB_alternando(listaReordenadaB, 6, 'art. 13.3.a', traza);
   }
   return {
     listaReordenada,
@@ -1071,7 +1103,7 @@ function renderResultadoSorteo() {
     </div>`).join('');
 
   function filaTabla(p, esTitular) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (esTitular ? '-TIT' : '-SUP');
+    const codigo = codigoBloque(p, STATE.tipoPlaza) + (esTitular ? '-TIT' : '-SUP');
     const codeClass = esTitular ? 'tit' : 'sup';
     return `<tr>
       <td class="code-cell ${codeClass}">${codigo}</td>
@@ -1273,7 +1305,7 @@ function exportarActaExcel() {
   rows.push([`COMPOSICIÓN COMISIÓN DE SELECCIÓN — PLAZA ${STATE.codigoPlaza}`]);
   rows.push(headers);
   function fila(p, tit) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
+    const codigo = codigoBloque(p, STATE.tipoPlaza) + (tit ? '-TIT' : '-SUP');
     return [codigo, p.numero, p.dni, nombreCompleto(p), tit ? 'Titular' : 'Suplente', p.universidad,
       p.categoria, p.situacion, p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo];
   }
@@ -1328,7 +1360,7 @@ function exportarActaPDF() {
   const r = STATE.resultado;
   if (!r) return;
   function fila(p, tit) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
+    const codigo = codigoBloque(p, STATE.tipoPlaza) + (tit ? '-TIT' : '-SUP');
     return `<tr><td>${codigo}</td><td>${p.numero}</td><td>${p.dni}</td><td>${nombreCompleto(p)}</td>
       <td>${tit ? 'Titular' : 'Suplente'}</td><td>${p.universidad}</td><td>${p.categoria}</td>
       <td>${p.situacion}</td><td>${p.areaCodigo}</td><td>${p.areaNombre}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
