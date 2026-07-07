@@ -1190,6 +1190,14 @@ function renderResultadoSorteo() {
   return `
     <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:26px 0 4px;">Traza del procedimiento</h3>
     <p class="sub2" style="margin-bottom:0;">Lógica aplicada paso a paso conforme al ${reglaLabel}.</p>
+    ${(STATE.subcategoria === 'titular' || STATE.subcategoria === 'agregado') ? `
+    <div class="banner-warn2" style="margin-top:10px;">
+      ℹ <span>Los pasos marcados como <b>"forzado CP"</b> o <b>"refuerzo"</b> en el Bloque B derivan directamente del
+      art. 13.3.b, que exige literalmente un mínimo de <b>tres</b> personas Catedrático/Pleno tras la 5ª elección y de
+      <b>cuatro</b> tras la 6ª. Son cifras fijas del propio artículo, no un porcentaje, por lo que <b>no dependen</b>
+      del selector del 40% del Paso 2 (art. 12.4): ese selector solo afecta a la validación de la propuesta original,
+      nunca al algoritmo del sorteo.</span>
+    </div>` : ''}
     <div class="trace">${trazaHtml}</div>
 
     <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:22px 0 10px;">Composición resultante</h3>
