@@ -874,7 +874,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.0</div>
+      <div class="meta-code">v1.1</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}
@@ -917,7 +917,7 @@ function renderPaso1() {
         <div class="subcat-opt ${STATE.subcategoria === key ? 'selected' : ''} ${!sub.enabled ? 'disabled' : ''}"
              ${sub.enabled ? `onclick="setSubcategoria('${key}')"` : ''}>
           <span class="radio-dot"></span><span>${sub.label}</span>
-          ${!sub.enabled ? '<span class="tag-soon">v1.1</span>' : ''}
+          ${!sub.enabled ? '<span class="tag-soon">v1.2</span>' : ''}
         </div>
       `).join('')}
     </div>` : ''}
