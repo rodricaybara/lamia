@@ -667,8 +667,11 @@ function validarPropuesta() {
     `Se han detectado ${personas.length} filas y la numeración no es 1–17 consecutiva sin duplicados.`,
     'Revisa el Excel de origen: cada fila debe tener un número de orden único de 1 a 17.');
 
-  const bloqueA = personas.filter(p => isUPV(p.universidad));
-  const bloqueB = personas.filter(p => !isUPV(p.universidad));
+  // Para Acuerdo 2024 los bloques se determinan por número de orden (1-8 / 9-17),
+  // no por afiliación: el art. 12.1.A permite completar el Bloque A con personal
+  // externo si no es posible reunir 8 personas de la UPV/EHU. Para Ayudante Doctor
+  // el Bloque A es exclusivamente UPV/EHU, por lo que getBloquesPropuesta usa isUPV.
+  const { bloqueA, bloqueB } = getBloquesPropuesta(personas, STATE.tipoPlaza);
 
   if (reglamento.bloqueAExclusivoUPV) {
     if (bloqueA.length === 8 && bloqueB.length === 9) {
@@ -681,7 +684,7 @@ function validarPropuesta() {
   } else {
     if (personas.length === 17 && bloqueB.length === 9) {
       addOk(`Tamaño de la propuesta: 17 personas totales, 9 externas en Bloque B (correcto).`);
-      const upvEnA = bloqueA.length;
+      const upvEnA = bloqueA.filter(p => isUPV(p.universidad)).length;
       // art. 12.3 (rango 2-4) es específico de Pleno/Agregado en plaza no bilingüe.
       // En Catedrático y Titular, y en cualquier subcategoría bilingüe, rige el régimen
       // general del art. 12.1.A: con carácter general las 8 personas son de la UPV/EHU,
@@ -783,9 +786,8 @@ function validarPropuesta() {
             `Sustituye a alguna persona de ${nombreBloque} por otra de categoría Catedrático/a o Pleno hasta alcanzar el mínimo de ${minimo}.`);
         }
       }
-      const bloques40 = getBloquesPropuesta(personas, STATE.tipoPlaza);
-      checkPorcentaje40(bloques40.bloqueA, 'Bloque A');
-      checkPorcentaje40(bloques40.bloqueB, 'Bloque B');
+      checkPorcentaje40(bloqueA, 'Bloque A');
+      checkPorcentaje40(bloqueB, 'Bloque B');
     }
   }
 
