@@ -488,18 +488,20 @@ function elegePareja(pool, requiereBilingueEnPrimera, segundoNoUPV) {
   return { pareja: [primera], restante: pool };
 }
 
-function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza) {
+function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza, refA = 'art. 4.2.a', refB = 'art. 4.2.b') {
   // listaReordenada ya viene acotada al Bloque A por posición (ver calcularComposicion);
   // no se vuelve a filtrar por afiliación para no excluir a los externos admitidos
   // excepcionalmente en Bloque A (art. 12.1.A, Acuerdo 2024).
+  // refA/refB permiten reutilizar este mismo algoritmo (idéntico en su lógica) citando
+  // el artículo correcto según el reglamento: art. 4.2 en Ayudante Doctor, art. 13.2.1 en Acuerdo 2024.
   let pool = listaReordenada.slice();
   const r1 = elegePareja(pool, bilingue, false);
-  traza.push({ bloque: 'A', regla: 'art. 4.2.a', texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
+  traza.push({ bloque: 'A', regla: refA, texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
   let suplentes = [];
   let poolN = r1.restante;
   for (let i = 0; i < 2; i++) {
     const rn = elegePareja(poolN, bilingue, false);
-    traza.push({ bloque: 'A', regla: 'art. 4.2.b', texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
+    traza.push({ bloque: 'A', regla: refB, texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
     suplentes = suplentes.concat(rn.pareja);
     poolN = rn.restante;
   }
@@ -512,7 +514,7 @@ function bloqueA_Acuerdo2024(listaReordenada, subcategoria, bilingue, traza) {
   // art. 13.2.2 (pareja UPV/EHU + externo) es EXCLUSIVO de Pleno/Agregado no bilingüe.
   const usa13_2_2 = (subcategoria === 'pleno' || subcategoria === 'agregado') && !bilingue;
   if (!usa13_2_2) {
-    return bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza);
+    return bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza, 'art. 13.2.1.a', 'art. 13.2.1.b');
   }
   let pool = listaReordenada.slice();
   const r1 = elegePareja(pool, false, true);
@@ -1210,7 +1212,6 @@ function renderResultadoSorteo() {
     </tr>`;
   }
 
-  const bloqueA = STATE.personas.filter(p => isUPV(p.universidad));
   const mujeresTit = r.titulares.filter(p => p.sexo === 'MUJER').length;
   const externosTit = r.titulares.filter(p => !isUPV(p.universidad)).length;
   const algunBilingueComision = [...r.titulares, ...r.suplentes].some(p => isBilingue(p.perfil));
