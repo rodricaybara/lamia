@@ -192,7 +192,7 @@ const REGLAMENTOS = {
       catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a', enabled: true },
       pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
       titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'TITULAR'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
-      agregado:    { label: 'Agregado',       categoriasPermitidas: null, enabled: false },
+      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD'], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad o Agregado/a', enabled: true },
     },
   },
 };
@@ -588,6 +588,7 @@ function bloqueB_titular(listaReordenada, traza) {
   const cpEnTitular = seleccion.slice(0, 3).filter(esCatedraticoOPleno).length;
   if (cpEnTitular > 1) {
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'Continúa la alternancia de género (ya hay más de una persona Catedrático/Pleno en el tribunal titular)');
+    elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'Continúa la alternancia de género');
   } else {
     elegir(pickCP(), 'art. 13.3.b', 'Refuerzo: primera persona restante de categoría Catedrático/Pleno');
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'A continuación, primera persona de género distinto');
