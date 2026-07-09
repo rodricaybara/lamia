@@ -192,7 +192,13 @@ const REGLAMENTOS = {
       catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a', enabled: true },
       pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
       titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'TITULAR'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
-      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD'], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad o Agregado/a', enabled: true },
+      // PROFESOR/A CONTRATADO/A DOCTOR/A (PDC) se admite como categoría equiparada a Agregado/a.
+      // En la UPV/EHU ambas denominaciones designan la misma figura laboral: "Agregado/a" es el
+      // nombre de la categoría según la Ley del Sistema Universitario Vasco (certificación Unibasq),
+      // mientras que "Profesor/a Contratado/a Doctor/a" es el término estatal usado habitualmente
+      // en la gestión y actas de la UPV/EHU. No consta expresamente en el art. 12.4.d del Acuerdo
+      // 26/09/2024 (que solo cita Catedrático/Pleno/Titular/Agregado), pero es la misma figura.
+      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD', 'CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC'], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC)', enabled: true },
     },
   },
 };
