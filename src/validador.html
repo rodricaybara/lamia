@@ -128,6 +128,11 @@
 
   .banner-carried{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ok); background:var(--ok-bg); border:1px solid var(--ok); border-radius:var(--radius); padding:9px 14px; margin-bottom:22px;}
   .banner-warn2{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn); border-radius:var(--radius); padding:9px 14px; margin-bottom:22px;}
+  .banner-info{display:flex; align-items:flex-start; gap:10px; font-size:12.5px; color:var(--ink); background:#EEF2F7; border:1px solid #B9C4D6; border-radius:var(--radius); padding:11px 14px; margin-bottom:22px;}
+  .banner-info .icon{flex:0 0 auto; font-weight:700; color:#3E5C82;}
+  .banner-info b{font-weight:600;}
+  .banner-info ul{margin:6px 0 0; padding-left:18px;}
+  .banner-info li{margin-bottom:3px;}
 
   .balls-section{margin-bottom:24px;}
   .balls-section h3{font-family:'Source Serif 4', serif; font-size:15px; font-weight:600; margin:0 0 4px;}
@@ -226,6 +231,7 @@ const STATE = {
   codigoPlazaAttempted: false,
   issues: [],                // resultado de validación: [{id, tipo:'error'|'warn', tag, ref, desc, sugerencia, cpuResuelto, cpuRef}]
   checksOk: [],
+  equivalenciasCategoria: [], // categorías admitidas por equivalencia (p.ej. PDC = Titular/Agregado), para el cuadro informativo del Paso 2
   bolas: Array(17).fill(''),
   bolasA: Array(8).fill(''),
   bolasB: Array(9).fill(''),
@@ -790,12 +796,20 @@ function validarPropuesta() {
     }
   }
 
+  const equivalenciasCategoria = [];
+  const STEMS_PDC = ['CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC'];
+
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const noValidos = bloqueB.filter(p => !CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR.includes(p.categoria));
+    const stemsAdmitidos = ['CATEDRATIC', 'TITULAR', ...STEMS_PDC];
+    const noValidos = bloqueB.filter(p => !esCategoria(p, stemsAdmitidos));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad — art. 3.1.b.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
       'Sustituir por una persona con categoría de Catedrático/a o Titular de Universidad, del área correspondiente o de área afín si no hay disponibilidad.'));
+    bloqueB.filter(p => esCategoria(p, STEMS_PDC)).forEach(p => equivalenciasCategoria.push({
+      numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
+      equivaleA: 'Titular de Universidad', ref: 'art. 3.1.b',
+    }));
   } else {
     const sub = REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria];
     const permitidas = sub.categoriasPermitidas;
@@ -805,6 +819,12 @@ function validarPropuesta() {
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 12.4',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${label}).`,
       `Sustituir por una persona con categoría ${label}.`));
+    if (STATE.subcategoria === 'agregado') {
+      personas.filter(p => esCategoria(p, STEMS_PDC)).forEach(p => equivalenciasCategoria.push({
+        numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
+        equivaleA: 'Agregado/a', ref: 'art. 12.4.d',
+      }));
+    }
 
     // art. 12.4.c/d — mínimo del 40% de Catedrático/Pleno en cada bloque, exigido solo
     // para Titular y Agregado (en Catedrático y Pleno la categoría ya es 100% Catedrático/Pleno).
@@ -838,6 +858,7 @@ function validarPropuesta() {
 
   STATE.issues = issues;
   STATE.checksOk = checksOk;
+  STATE.equivalenciasCategoria = equivalenciasCategoria;
 }
 
 function hayBloqueantes() {
@@ -1025,6 +1046,33 @@ function irAValidacion() {
    PASO 2
    ========================================================================== */
 
+function renderAvisoEquivalenciasCategoria() {
+  const aplicaAyudanteDoctor = STATE.tipoPlaza === 'ayudante_doctor';
+  const aplicaAgregado = STATE.tipoPlaza === 'acuerdo2024' && STATE.subcategoria === 'agregado';
+  if (!aplicaAyudanteDoctor && !aplicaAgregado) return '';
+
+  const equivaleA = aplicaAyudanteDoctor ? 'Titular de Universidad' : 'Agregado/a';
+  const ref = aplicaAyudanteDoctor ? 'art. 3.1.b' : 'art. 12.4.d';
+  const detectadas = STATE.equivalenciasCategoria;
+
+  return `
+  <div class="banner-info">
+    <span class="icon">ℹ</span>
+    <div>
+      <b>Equivalencia de categoría aplicada:</b> "Profesor/a Contratado/a Doctor/a" (PDC) se considera
+      equiparable a <b>${equivaleA}</b> (${ref}). Esta equivalencia no consta expresamente en el texto de
+      la norma, pero corresponde a la misma figura laboral en la UPV/EHU: "Agregado/a" es la denominación
+      según la Ley del Sistema Universitario Vasco (certificación Unibasq), mientras que "Profesor/a
+      Contratado/a Doctor/a" es el término estatal habitual en la gestión y actas de la universidad.
+      ${detectadas.length > 0 ? `
+      <ul>
+        ${detectadas.map(e => `<li>Fila ${e.numero} — <b>${e.nombre}</b>: categoría "${e.categoriaOriginal}" admitida como equivalente a ${e.equivaleA}.</li>`).join('')}
+      </ul>` : `
+      <p style="margin:6px 0 0; color:var(--ink-soft);">No se ha detectado ninguna persona con esta categoría en la propuesta actual.</p>`}
+    </div>
+  </div>`;
+}
+
 function renderPaso2() {
   const bloqueantes = hayBloqueantes();
   const numErrores = STATE.issues.filter(i => i.tipo === 'error' && !i.cpuResuelto).length;
@@ -1063,6 +1111,8 @@ function renderPaso2() {
         alza previsto literalmente por la norma (mínimo 4).
       </p>
     </div>` : ''}
+
+    ${renderAvisoEquivalenciasCategoria()}
 
     <div class="stamp-row">${stampHtml}</div>
 
