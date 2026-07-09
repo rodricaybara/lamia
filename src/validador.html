@@ -178,6 +178,18 @@
    CONFIGURACIÓN NORMATIVA
    ========================================================================== */
 
+// Categorías laborales equiparadas a Agregado/a (y, en Ayudante Doctor, a Titular de Universidad).
+// En la UPV/EHU designan la misma figura que "Agregado/a" (denominación según la Ley del Sistema
+// Universitario Vasco / certificación Unibasq), con distintos nombres según el término usado:
+//  - "Profesor/a Contratado/a Doctor/a" (PDC): término estatal clásico.
+//  - "Profesor/a Permanente Laboral" / "Laboral Permanente": nueva denominación de la LOSU.
+// No constan expresamente citadas en el Acuerdo 26/09/2024 ni en el Reglamento Ayudante Doctor,
+// pero corresponden a la misma figura — ver conversación con Fernando (Vicerrectorado de PDI).
+const STEMS_EQUIVALENTES_AGREGADO = [
+  'CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC',
+  'LABORAL PERMANENTE', 'PERMANENTE LABORAL',
+];
+
 const REGLAMENTOS = {
   ayudante_doctor: {
     label: 'Profesorado Ayudante Doctor',
@@ -197,13 +209,9 @@ const REGLAMENTOS = {
       catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a', enabled: true },
       pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
       titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'TITULAR'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
-      // PROFESOR/A CONTRATADO/A DOCTOR/A (PDC) se admite como categoría equiparada a Agregado/a.
-      // En la UPV/EHU ambas denominaciones designan la misma figura laboral: "Agregado/a" es el
-      // nombre de la categoría según la Ley del Sistema Universitario Vasco (certificación Unibasq),
-      // mientras que "Profesor/a Contratado/a Doctor/a" es el término estatal usado habitualmente
-      // en la gestión y actas de la UPV/EHU. No consta expresamente en el art. 12.4.d del Acuerdo
-      // 26/09/2024 (que solo cita Catedrático/Pleno/Titular/Agregado), pero es la misma figura.
-      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD', 'CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC'], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC)', enabled: true },
+      // Bloque A/B admiten también las categorías laborales equiparadas a Agregado/a — ver
+      // STEMS_EQUIVALENTES_AGREGADO más arriba.
+      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD', ...STEMS_EQUIVALENTES_AGREGADO], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC) / Permanente Laboral', enabled: true },
     },
   },
 };
@@ -797,16 +805,15 @@ function validarPropuesta() {
   }
 
   const equivalenciasCategoria = [];
-  const STEMS_PDC = ['CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC'];
 
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const stemsAdmitidos = ['CATEDRATIC', 'TITULAR', ...STEMS_PDC];
+    const stemsAdmitidos = ['CATEDRATIC', 'TITULAR', ...STEMS_EQUIVALENTES_AGREGADO];
     const noValidos = bloqueB.filter(p => !esCategoria(p, stemsAdmitidos));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad — art. 3.1.b.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
       'Sustituir por una persona con categoría de Catedrático/a o Titular de Universidad, del área correspondiente o de área afín si no hay disponibilidad.'));
-    bloqueB.filter(p => esCategoria(p, STEMS_PDC)).forEach(p => equivalenciasCategoria.push({
+    bloqueB.filter(p => esCategoria(p, STEMS_EQUIVALENTES_AGREGADO)).forEach(p => equivalenciasCategoria.push({
       numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
       equivaleA: 'Titular de Universidad', ref: 'art. 3.1.b',
     }));
@@ -820,7 +827,7 @@ function validarPropuesta() {
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${label}).`,
       `Sustituir por una persona con categoría ${label}.`));
     if (STATE.subcategoria === 'agregado') {
-      personas.filter(p => esCategoria(p, STEMS_PDC)).forEach(p => equivalenciasCategoria.push({
+      personas.filter(p => esCategoria(p, STEMS_EQUIVALENTES_AGREGADO)).forEach(p => equivalenciasCategoria.push({
         numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
         equivaleA: 'Agregado/a', ref: 'art. 12.4.d',
       }));
@@ -1059,11 +1066,12 @@ function renderAvisoEquivalenciasCategoria() {
   <div class="banner-info">
     <span class="icon">ℹ</span>
     <div>
-      <b>Equivalencia de categoría aplicada:</b> "Profesor/a Contratado/a Doctor/a" (PDC) se considera
-      equiparable a <b>${equivaleA}</b> (${ref}). Esta equivalencia no consta expresamente en el texto de
+      <b>Equivalencia de categoría aplicada:</b> "Profesor/a Contratado/a Doctor/a" (PDC) y "Profesor/a
+      Permanente Laboral" / "Laboral Permanente" (nueva denominación LOSU) se consideran equiparables a
+      <b>${equivaleA}</b> (${ref}). Esta equivalencia no consta expresamente en el texto de
       la norma, pero corresponde a la misma figura laboral en la UPV/EHU: "Agregado/a" es la denominación
-      según la Ley del Sistema Universitario Vasco (certificación Unibasq), mientras que "Profesor/a
-      Contratado/a Doctor/a" es el término estatal habitual en la gestión y actas de la universidad.
+      según la Ley del Sistema Universitario Vasco (certificación Unibasq), mientras que los otros dos son
+      términos estatales (clásico y LOSU) habituales en la gestión y actas de la universidad.
       ${detectadas.length > 0 ? `
       <ul>
         ${detectadas.map(e => `<li>Fila ${e.numero} — <b>${e.nombre}</b>: categoría "${e.categoriaOriginal}" admitida como equivalente a ${e.equivaleA}.</li>`).join('')}
