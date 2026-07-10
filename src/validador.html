@@ -672,6 +672,8 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
   }
   return {
     listaReordenada,
+    listaReordenadaA,
+    listaReordenadaB,
     titulares: [...a.titulares, ...b.titulares],
     suplentes: [...a.suplentes, ...b.suplentes],
     traza,
@@ -1586,11 +1588,16 @@ function exportarInformePDF() {
 function exportarActaPDF() {
   const r = STATE.resultado;
   if (!r) return;
+  const reglamento = REGLAMENTOS[STATE.tipoPlaza];
   function fila(p, tit) {
     const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
     return `<tr><td>${codigo}</td><td>${p.numero}</td><td>${nombreCompleto(p)}</td>
       <td>${tit ? 'Titular' : 'Suplente'}</td><td>${p.universidad}</td><td>${p.categoria}</td>
       <td>${p.situacion}</td><td>${p.areaCodigo}</td><td>${p.areaNombre}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
+  }
+  function filaPropuesta(p) {
+    return `<tr><td>${p.numero}</td><td>${nombreCompleto(p)}</td><td>${p.universidad}</td>
+      <td>${p.categoria}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
   }
   let body = `<h1>Composición Comisión de Selección — Plaza ${STATE.codigoPlaza}</h1>`;
   body += `<table><thead><tr><th>Código</th><th>Nº</th><th>Nombre y apellidos</th><th>Función</th>
@@ -1600,6 +1607,21 @@ function exportarActaPDF() {
   body += r.suplentes.map(p => fila(p, false)).join('');
   body += `</tbody></table>`;
   body += `<h2>Traza del procedimiento</h2><ol>${r.traza.map(t => `<li><b>Bloque ${t.bloque}</b> (${t.regla}) — ${t.texto}</li>`).join('')}</ol>`;
+
+  body += `<h2>Orden del sorteo</h2>`;
+  body += `<p>${r.listaReordenada.map(p => p.numero).join(' → ')}</p>`;
+
+  body += `<h2>Propuesta reordenada por bloques</h2>`;
+  body += `<p>Listas de partida usadas por el algoritmo, ya en el orden fijado por el sorteo, para poder reproducir manualmente los pasos anteriores.</p>`;
+  body += `<h3>Bloque A (nº 1–${reglamento.bloqueASize})</h3>`;
+  body += `<table><thead><tr><th>Nº</th><th>Nombre y apellidos</th><th>Universidad</th><th>Cuerpo-Categoría</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
+  body += r.listaReordenadaA.map(filaPropuesta).join('');
+  body += `</tbody></table>`;
+  body += `<h3>Bloque B (nº ${reglamento.bloqueASize + 1}–${reglamento.bloqueASize + reglamento.bloqueBSize})</h3>`;
+  body += `<table><thead><tr><th>Nº</th><th>Nombre y apellidos</th><th>Universidad</th><th>Cuerpo-Categoría</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
+  body += r.listaReordenadaB.map(filaPropuesta).join('');
+  body += `</tbody></table>`;
+
   abrirVentanaImpresion(`Acta composición ${STATE.codigoPlaza}`, body);
 }
 
