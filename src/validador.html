@@ -172,7 +172,7 @@
 <body>
 <div class="wrap" id="app"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
 <script>
 /* ==========================================================================
    CONFIGURACIÓN NORMATIVA
@@ -1474,10 +1474,51 @@ function exportarActaExcel() {
       p.categoria, p.situacion, p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo];
   }
   r.titulares.forEach(p => rows.push(fila(p, true)));
+  const filaSeparador = rows.length; // índice (0-based) de la fila vacía entre titulares y suplentes
   rows.push(Array(12).fill(''));
   r.suplentes.forEach(p => rows.push(fila(p, false)));
+
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = headers.map(() => ({ wch: 18 }));
+
+  // Anchos de columna — copiados del acta de referencia (muestra_comision.xlsx)
+  ws['!cols'] = [
+    { wch: 17.5 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 50.5 }, { wch: 16.2 }, { wch: 56.5 },
+    { wch: 27.2 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 14.5 }, { wch: 8.5 },
+  ];
+  // Fila de cabecera alta, igual que en la muestra, para que quepa el texto ajustado
+  ws['!rows'] = [{ hpt: 18 }, { hpt: 101.5 }];
+
+  const bordeFino = { style: 'thin', color: { rgb: '000000' } };
+  const estiloBorde = { top: bordeFino, bottom: bordeFino, left: bordeFino, right: bordeFino };
+  const estiloCabecera = {
+    font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: '000000' } },
+    fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } }, // dorado claro, igual que la muestra
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: estiloBorde,
+  };
+  const estiloDato = {
+    font: { name: 'Calibri', sz: 11, color: { rgb: '000000' } },
+    border: estiloBorde,
+  };
+  const estiloSeparador = {
+    fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } }, // amarillo, fila divisoria titulares/suplentes
+    border: estiloBorde,
+  };
+
+  headers.forEach((_, col) => {
+    const addr = XLSX.utils.encode_cell({ r: 1, c: col });
+    if (ws[addr]) ws[addr].s = estiloCabecera;
+  });
+
+  for (let rIdx = 2; rIdx < rows.length; rIdx++) {
+    const estiloFila = rIdx === filaSeparador ? estiloSeparador : estiloDato;
+    for (let cIdx = 0; cIdx < 12; cIdx++) {
+      const addr = XLSX.utils.encode_cell({ r: rIdx, c: cIdx });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      ws[addr].s = estiloFila;
+    }
+  }
+
   XLSX.utils.book_append_sheet(wb, ws, 'Composición');
   XLSX.writeFile(wb, `Composicion_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
 }
