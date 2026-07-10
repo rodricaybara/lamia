@@ -1470,7 +1470,7 @@ function exportarActaExcel() {
   rows.push(headers);
   function fila(p, tit) {
     const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
-    return [codigo, p.numero, p.dni, nombreCompleto(p), tit ? 'Titular' : 'Suplente', p.universidad,
+    return [codigo, p.numero, p.dni, nombreCompleto(p).toUpperCase(), tit ? 'Titular' : 'Suplente', (p.universidad || '').toUpperCase(),
       p.categoria, p.situacion, p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo];
   }
   r.titulares.forEach(p => rows.push(fila(p, true)));
@@ -1480,10 +1480,31 @@ function exportarActaExcel() {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
 
-  // Anchos de columna — copiados del acta de referencia (muestra_comision.xlsx)
+  // Título fusionado A1:G1, en negrita
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  if (ws['A1']) ws['A1'].s = { font: { name: 'Calibri', sz: 11, bold: true } };
+
+  // Ancho fijo para las columnas ya calibradas con la muestra; ancho automático (según el
+  // contenido más largo, sin contar título ni cabecera) para categoría y área de conocimiento,
+  // que son las que más varían de una plaza a otra.
+  function anchoAuto(colIdx, minimo, maximo) {
+    let max = minimo;
+    for (let i = 2; i < rows.length; i++) {
+      const val = rows[i][colIdx];
+      if (val !== undefined && val !== null && val !== '') {
+        const len = String(val).length;
+        if (len > max) max = len;
+      }
+    }
+    return Math.min(max + 2, maximo);
+  }
   ws['!cols'] = [
     { wch: 17.5 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 50.5 }, { wch: 16.2 }, { wch: 56.5 },
-    { wch: 27.2 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 14.5 }, { wch: 8.5 },
+    { wch: anchoAuto(6, 10, 45) },  // G — CUERPO-CATEGORIA
+    { wch: 8.5 },
+    { wch: anchoAuto(8, 8, 20) },   // I — Área de conocimiento (código)
+    { wch: anchoAuto(9, 15, 55) },  // J — Área de conocimiento (literal, la que suele ser larga)
+    { wch: 14.5 }, { wch: 8.5 },
   ];
   // Fila de cabecera alta, igual que en la muestra, para que quepa el texto ajustado
   ws['!rows'] = [{ hpt: 18 }, { hpt: 101.5 }];
