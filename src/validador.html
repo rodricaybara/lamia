@@ -1310,7 +1310,7 @@ function renderResultadoSorteo() {
     </table>
     </div>
     <p style="font-size:11.5px; color:var(--ink-soft); margin-top:8px;">
-      DNI mostrado enmascarado en pantalla por protección de datos; el archivo Excel exportado incluye el valor completo para su incorporación al expediente.
+      DNI mostrado enmascarado en pantalla por protección de datos; no figura en ninguna de las exportaciones (Excel ni PDF).
     </p>
 
     <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:22px 0 10px;">Verificación final</h3>
@@ -1462,7 +1462,7 @@ function exportarActaExcel() {
   const r = STATE.resultado;
   if (!r) return;
   const wb = XLSX.utils.book_new();
-  const headers = ['CODIGO', 'Número', 'DNI/NAN', 'NOMBRE Y APELLIDOS', 'FUNCION TRIBUNAL', 'UNIVERSIDAD',
+  const headers = ['CODIGO', 'Número', 'NOMBRE Y APELLIDOS', 'FUNCION TRIBUNAL', 'UNIVERSIDAD',
     'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA', 'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)',
     'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)', 'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
   const rows = [];
@@ -1470,12 +1470,13 @@ function exportarActaExcel() {
   rows.push(headers);
   function fila(p, tit) {
     const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
-    return [codigo, p.numero, p.dni, nombreCompleto(p).toUpperCase(), tit ? 'Titular' : 'Suplente', (p.universidad || '').toUpperCase(),
+    // Sin DNI: es un dato personal y no debe figurar en el acta exportada.
+    return [codigo, p.numero, nombreCompleto(p).toUpperCase(), tit ? 'Titular' : 'Suplente', (p.universidad || '').toUpperCase(),
       p.categoria, p.situacion, p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo];
   }
   r.titulares.forEach(p => rows.push(fila(p, true)));
   const filaSeparador = rows.length; // índice (0-based) de la fila vacía entre titulares y suplentes
-  rows.push(Array(12).fill(''));
+  rows.push(Array(11).fill(''));
   r.suplentes.forEach(p => rows.push(fila(p, false)));
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1499,11 +1500,11 @@ function exportarActaExcel() {
     return Math.min(max + 2, maximo);
   }
   ws['!cols'] = [
-    { wch: 17.5 }, { wch: 8.5 }, { wch: 8.5 }, { wch: 50.5 }, { wch: 16.2 }, { wch: 56.5 },
-    { wch: anchoAuto(6, 10, 45) },  // G — CUERPO-CATEGORIA
+    { wch: 17.5 }, { wch: 8.5 }, { wch: 50.5 }, { wch: 16.2 }, { wch: 56.5 },
+    { wch: anchoAuto(5, 10, 45) },  // F — CUERPO-CATEGORIA
     { wch: 8.5 },
-    { wch: anchoAuto(8, 8, 20) },   // I — Área de conocimiento (código)
-    { wch: anchoAuto(9, 15, 55) },  // J — Área de conocimiento (literal, la que suele ser larga)
+    { wch: anchoAuto(7, 8, 20) },   // H — Área de conocimiento (código)
+    { wch: anchoAuto(8, 15, 55) },  // I — Área de conocimiento (literal, la que suele ser larga)
     { wch: 14.5 }, { wch: 8.5 },
   ];
   // Fila de cabecera alta, igual que en la muestra, para que quepa el texto ajustado
@@ -1533,7 +1534,7 @@ function exportarActaExcel() {
 
   for (let rIdx = 2; rIdx < rows.length; rIdx++) {
     const estiloFila = rIdx === filaSeparador ? estiloSeparador : estiloDato;
-    for (let cIdx = 0; cIdx < 12; cIdx++) {
+    for (let cIdx = 0; cIdx < 11; cIdx++) {
       const addr = XLSX.utils.encode_cell({ r: rIdx, c: cIdx });
       if (!ws[addr]) ws[addr] = { t: 's', v: '' };
       ws[addr].s = estiloFila;
@@ -1587,15 +1588,15 @@ function exportarActaPDF() {
   if (!r) return;
   function fila(p, tit) {
     const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
-    return `<tr><td>${codigo}</td><td>${p.numero}</td><td>${p.dni}</td><td>${nombreCompleto(p)}</td>
+    return `<tr><td>${codigo}</td><td>${p.numero}</td><td>${nombreCompleto(p)}</td>
       <td>${tit ? 'Titular' : 'Suplente'}</td><td>${p.universidad}</td><td>${p.categoria}</td>
       <td>${p.situacion}</td><td>${p.areaCodigo}</td><td>${p.areaNombre}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
   }
   let body = `<h1>Composición Comisión de Selección — Plaza ${STATE.codigoPlaza}</h1>`;
-  body += `<table><thead><tr><th>Código</th><th>Nº</th><th>DNI/NAN</th><th>Nombre y apellidos</th><th>Función</th>
+  body += `<table><thead><tr><th>Código</th><th>Nº</th><th>Nombre y apellidos</th><th>Función</th>
     <th>Universidad</th><th>Cuerpo-Categoría</th><th>Situación</th><th>Área (cód.)</th><th>Área (literal)</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
   body += r.titulares.map(p => fila(p, true)).join('');
-  body += `<tr class="sep"><td colspan="12"></td></tr>`;
+  body += `<tr class="sep"><td colspan="11"></td></tr>`;
   body += r.suplentes.map(p => fila(p, false)).join('');
   body += `</tbody></table>`;
   body += `<h2>Traza del procedimiento</h2><ol>${r.traza.map(t => `<li><b>Bloque ${t.bloque}</b> (${t.regla}) — ${t.texto}</li>`).join('')}</ol>`;
