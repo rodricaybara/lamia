@@ -6,6 +6,98 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-07-10
+
+Incorpora la subcategoría **Agregado** (Acuerdo 26/09/2024, BOPV 10/10/2024), reutilizando
+gran parte del motor ya construido para Titular en la v1.1.0. Verificada por ahora solo en
+perfil bilingüe (CASO-006); el perfil no bilingüe queda pendiente de un caso real para
+contrastarlo — ver "Known issues".
+
+### Added
+
+- Subcategoría `agregado` habilitada en `REGLAMENTOS.acuerdo2024.subcategorias` (art.
+  12.4.d): categorías permitidas Catedrático/a, Profesor/a Pleno, Titular de Universidad
+  o Agregado/a. Bloque A reutiliza el mismo enrutado 13.2.1/13.2.2 que Pleno; Bloque B
+  reutiliza `bloqueB_titular()` (art. 13.3.b), ya generalizado para Titular y Agregado.
+- Equivalencia de categoría: "Profesor/a Contratado/a Doctor/a" (PDC) y "Profesor/a
+  Permanente Laboral" / "Laboral Permanente" (nueva denominación LOSU) se admiten como
+  categoría equiparada a Agregado/a (art. 12.4.d) y, específicamente en Ayudante Doctor,
+  como equiparada a Titular de Universidad (art. 3.1.b). En la UPV/EHU ambas
+  denominaciones designan la misma figura laboral que "Agregado/a" (Ley del Sistema
+  Universitario Vasco / certificación Unibasq); no consta expresamente citada en ninguno
+  de los dos reglamentos. Centralizada en la constante `STEMS_EQUIVALENTES_AGREGADO`
+  para no duplicar la lista entre `REGLAMENTOS` y `validarPropuesta()`.
+- Cuadro informativo nuevo en el Paso 2 (`renderAvisoEquivalenciasCategoria()`): se
+  muestra automáticamente cuando el contexto admite esta equivalencia (Ayudante Doctor o
+  Agregado), explica el criterio aplicado y su justificación, y lista las filas concretas
+  de la propuesta actual afectadas, si las hay.
+- CASO-006 (Agregado bilingüe, AGC8L1-D00331-20) documentado como caso de referencia,
+  marcado "analizado, no decisivo": la composición coincide con la de la plantilla
+  oficial, pero la distribución de categorías del Bloque B (8 Catedráticos de 9) hace que
+  el algoritmo simple (art. 13.3.a) y el de Titular/Agregado (art. 13.3.b) den el mismo
+  resultado en este caso concreto, por lo que no sirve para contrastar de forma decisiva
+  la implementación del art. 13.3.b en Agregado.
+- Acta en PDF (`exportarActaPDF()`): añadidas, después de la traza del procedimiento, dos
+  secciones nuevas — "Orden del sorteo" (secuencia completa de extracción) y "Propuesta
+  reordenada por bloques" (listas de Bloque A y Bloque B ya en el orden usado por el
+  algoritmo, con número, nombre, universidad, categoría, perfil lingüístico y sexo), para
+  poder reproducir manualmente cada paso de la traza. `calcularComposicion()` expone ahora
+  `listaReordenadaA`/`listaReordenadaB` en su resultado para alimentar estas tablas.
+- Maquetación del acta en Excel (`exportarActaExcel()`), copiada de una plantilla de
+  referencia (`muestra_comision.xlsx`) usando `xlsx-js-style` en vez de `xlsx.full.min.js`
+  (la edición community de SheetJS no admite escribir estilos, solo leerlos): cabecera con
+  relleno dorado claro (`#FFF2CC`), negrita, centrada y con ajuste de texto; bordes finos
+  en cabecera y datos; anchos de columna calibrados; fila separadora entre titulares y
+  suplentes con relleno amarillo; título fusionado A1:G1 en negrita; mayúsculas forzadas
+  en Nombre y Apellidos y Universidad; auto-ajuste de ancho en Cuerpo-Categoría y en ambas
+  columnas de Área de Conocimiento según el contenido más largo de cada propuesta.
+
+### Fixed
+
+- `bloqueB_titular()` (art. 13.3.b) producía solo 5 personas en vez de 6 cuando las dos
+  primeras elegidas ya eran ambas Catedrático/Pleno (`cpEnTitular > 1`): la rama
+  correspondiente solo añadía una persona más antes de saltar a los controles de mínimos
+  de la 5ª/6ª posición, cuando en ese punto la lista solo tenía 3 elementos — en realidad
+  rellenaba las posiciones 4 y 5, dejando la 6 sin cubrir. Corregido añadiendo la llamada
+  que faltaba para alcanzar la posición 4 antes de aplicar dichos controles. Afecta por
+  igual a Titular y Agregado; **pendiente de re-verificar CASO-005 con este fix
+  aplicado**, ya que no consta si el caso original disparaba esa rama del código.
+- Validación de categorías del Bloque B en Ayudante Doctor (`CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR`)
+  comparaba con igualdad de cadena exacta contra un array corto (`'CATEDRÁTICO'`,
+  `'CATEDRATICO'`, `'TITULAR'`), con lo que formas tan habituales como "CATEDRÁTICA" o
+  "PROFESORA TITULAR" se habrían marcado como anomalía. Corregido usando `esCategoria()`
+  por raíz léxica, igual que el resto del validador.
+- DNI eliminado de ambas exportaciones del acta (Excel y PDF): al ser un dato personal, no
+  debe figurar en documentos que se incorporan al expediente. Sigue mostrándose
+  enmascarado en la vista en pantalla del Paso 3 (no es una exportación).
+
+### Known issues
+
+- Agregado solo se ha verificado en perfil **bilingüe** (CASO-006). El perfil no
+  bilingüe (art. 13.2.2 en Bloque A) comparte código con Pleno no bilingüe, pero no se ha
+  contrastado con ningún caso real de Agregado no bilingüe — pendiente de un caso para
+  congelarlo.
+- CASO-006 no permite confirmar ni descartar la necesidad del algoritmo del art. 13.3.b
+  en Agregado (ver "Added"); sigue pendiente un caso con más Titulares/Agregados en el
+  Bloque B que fuerce la divergencia entre art. 13.3.a y art. 13.3.b, como ya se buscó sin
+  éxito para Titular en la v1.1.0.
+- La equivalencia PDC / Permanente Laboral = Agregado/Titular no consta expresamente en
+  el texto de ninguno de los dos reglamentos aplicados; se basa en que ambas
+  denominaciones corresponden a la misma figura laboral en la UPV/EHU (LSUV/Unibasq vs.
+  término estatal), confirmado por Fernando (Vicerrectorado de PDI). No se ha extendido
+  esta equivalencia a la subcategoría Titular del Acuerdo 2024 (decisión explícita: PDC
+  cuenta como Agregado, no como Titular, dentro del Acuerdo 2024).
+- Persisten sin corregir, heredados de la v1.1.0: el uso de `isUPV()` en vez de posición
+  en funciones de render puramente informativas, y la cita del art. 11.9 para situación
+  administrativa en Ayudante Doctor.
+
+### Not included in this version
+
+- Profesorado Personal Investigador Permanente (dos versiones normativas identificadas,
+  Resolución 20/10/2008 y su regulación asociada) — no implementado.
+
+---
+
 ## [1.1.0] — 2026-07-08
 
 Incorpora la subcategoría **Titular** (Acuerdo 26/09/2024, BOPV 10/10/2024), en perfil
