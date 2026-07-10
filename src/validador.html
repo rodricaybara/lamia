@@ -175,6 +175,8 @@ const REGLAMENTOS = {
     bloqueASize: 8, bloqueBSize: 9,
     bloqueAExclusivoUPV: true,
     subcategorias: null,
+    normativaUrl: 'https://www.ehu.eus/documents/d/iip/2402876a',
+    normativaLabel: '2402876a',
   },
   acuerdo2024: {
     label: 'Catedrático · Pleno · Titular · Agregado',
@@ -182,6 +184,8 @@ const REGLAMENTOS = {
     fuente: 'Reglamento 26/09/2024',
     bloqueASize: 8, bloqueBSize: 9,
     bloqueAExclusivoUPV: false,
+    normativaUrl: 'https://www.ehu.eus/documents/d/iip/reglamento-pdf',
+    normativaLabel: 'reglamento-pdf',
     subcategorias: {
       catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a', enabled: true },
       pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
@@ -637,8 +641,8 @@ function validarPropuesta() {
   const personas = STATE.personas;
   const reglamento = REGLAMENTOS[STATE.tipoPlaza];
   const bilingueReq = STATE.perfilLinguistico === 'bilingue';
-  let addIssue = (id, tipo, tag, ref, desc, sugerencia) => {
-    issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '' });
+  let addIssue = (id, tipo, tag, ref, desc, sugerencia, filas) => {
+    issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '', filas: filas || [] });
   };
   let addOk = (texto) => checksOk.push(texto);
   const nums = personas.map(p => p.numero).sort((a, b) => a - b);
@@ -692,7 +696,8 @@ function validarPropuesta() {
   if (noActivos.length === 0) addOk('Situación administrativa: las 17 personas constan como "Activo" — art. 11.9.');
   else addIssue('situacion', 'error', 'Situación administrativa no válida', 'art. 11.9',
     `${noActivos.length} persona(s) no constan en situación "Activo": ${noActivos.map(p => nombreCompleto(p)).join(', ')}.`,
-    'Las personas jubiladas o en situaciones distintas a servicio activo no pueden formar parte de la Comisión; sustitúyelas.');
+    'Las personas jubiladas o en situaciones distintas a servicio activo no pueden formar parte de la Comisión; sustitúyelas.',
+    noActivos.map(p => p.numero));
   const areas = [...new Set(personas.map(p => p.areaCodigo))];
   if (areas.length === 1) addOk(`Área de conocimiento: las 17 personas pertenecen al área ${areas[0]} — art. 12.1.`);
   else issues.push({
@@ -749,7 +754,8 @@ function validarPropuesta() {
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad — art. 3.1.b.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
-      'Sustituir por una persona con categoría de Catedrático/a o Titular de Universidad, del área correspondiente o de área afín si no hay disponibilidad.'));
+      'Sustituir por una persona con categoría de Catedrático/a o Titular de Universidad, del área correspondiente o de área afín si no hay disponibilidad.',
+      [p.numero]));
     bloqueB.filter(p => esCategoria(p, STEMS_EQUIVALENTES_AGREGADO)).forEach(p => equivalenciasCategoria.push({
       numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
       equivaleA: 'Titular de Universidad', ref: 'art. 3.1.b',
@@ -762,7 +768,8 @@ function validarPropuesta() {
     if (noValidos.length === 0) addOk(`Categorías: todas las personas cumplen la categoría exigida para plaza de ${sub.label} (${label}) — art. 12.4.`);
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 12.4',
       `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${label}).`,
-      `Sustituir por una persona con categoría ${label}.`));
+      `Sustituir por una persona con categoría ${label}.`,
+      [p.numero]));
     if (STATE.subcategoria === 'agregado') {
       personas.filter(p => esCategoria(p, STEMS_EQUIVALENTES_AGREGADO)).forEach(p => equivalenciasCategoria.push({
         numero: p.numero, nombre: nombreCompleto(p), categoriaOriginal: p.categoria,
@@ -803,6 +810,29 @@ function validarPropuesta() {
 }
 function hayBloqueantes() {
   return STATE.issues.some(i => i.tipo === 'error' && !i.cpuResuelto);
+}
+// Calcula, para cada número de fila de la propuesta, el nivel de resaltado a aplicar
+// en la tabla de datos del Paso 2: 'error' (anomalía sin resolver, más llamativo),
+// 'exc' (anomalía con excepción CPU ya aceptada) o 'warn' (aviso informativo, p.ej.
+// equivalencia de categoría admitida, resaltado más discreto). Solo se resaltan filas
+// para las que el motor de validación puede señalar una persona concreta (categoría,
+// situación administrativa, equivalencias); las anomalías de bloque completo (número
+// de miembros, género, bilingüismo global, 40% Catedrático/Pleno) no apuntan a una
+// única fila y no generan resaltado individual.
+function computeFilaHighlights() {
+  const prioridad = { error: 3, exc: 2, warn: 1 };
+  const map = {};
+  STATE.issues.forEach(issue => {
+    if (!issue.filas || issue.filas.length === 0) return;
+    const nivel = issue.tipo === 'warn' ? 'warn' : (issue.cpuResuelto ? 'exc' : 'error');
+    issue.filas.forEach(n => {
+      if (!map[n] || prioridad[nivel] > prioridad[map[n]]) map[n] = nivel;
+    });
+  });
+  STATE.equivalenciasCategoria.forEach(e => {
+    if (!map[e.numero]) map[e.numero] = 'warn';
+  });
+  return map;
 }
 </script>
 <script>
@@ -990,6 +1020,44 @@ function renderAvisoEquivalenciasCategoria() {
       <p style="margin:6px 0 0; color:var(--ink-soft);">No se ha detectado ninguna persona con esta categoría en la propuesta actual.</p>`}
     </div>
   </div>`;
+}
+function renderTablaPropuestaPDF() {
+  const highlights = computeFilaHighlights();
+  const personas = personasOrdenadasPorNumero(STATE.personas);
+  function fila(p) {
+    const nivel = highlights[p.numero];
+    const cls = nivel === 'error' ? 'row-anomalia' : nivel === 'exc' ? 'row-excepcion' : nivel === 'warn' ? 'row-aviso' : '';
+    return `<tr class="${cls}">
+      <td>${p.numero}</td>
+      <td>${maskDNI(p.dni)}</td>
+      <td>${nombreCompleto(p)}</td>
+      <td>${p.universidad}</td>
+      <td>${p.categoria}</td>
+      <td>${p.situacion}</td>
+      <td>${p.areaCodigo}</td>
+      <td>${p.areaNombre}</td>
+      <td>${p.perfil || '—'}</td>
+      <td>${p.sexo}</td>
+    </tr>`;
+  }
+  const niveles = Object.values(highlights);
+  const hayError = niveles.includes('error');
+  const hayExc = niveles.includes('exc');
+  const hayWarn = niveles.includes('warn');
+  let html = `<h2>Datos de la propuesta</h2>`;
+  html += `<p>Las 17 personas de la propuesta, en su numeración original (antes del sorteo).</p>`;
+  if (hayError || hayExc || hayWarn) {
+    html += `<div class="legend-row">`;
+    if (hayError) html += `<span><span class="swatch swatch-anomalia"></span>Anomalía a corregir</span>`;
+    if (hayExc) html += `<span><span class="swatch swatch-excepcion"></span>Excepción CPU aceptada</span>`;
+    if (hayWarn) html += `<span><span class="swatch swatch-aviso"></span>Aviso (p. ej. equivalencia de categoría)</span>`;
+    html += `</div>`;
+  }
+  html += `<table><thead><tr>
+      <th>Nº</th><th>DNI/NAN</th><th>Nombre y apellidos</th><th>Universidad</th><th>Cuerpo-Categoría</th>
+      <th>Situación</th><th>Área (código)</th><th>Área (literal)</th><th>Perfil ling.</th><th>Sexo</th>
+    </tr></thead><tbody>${personas.map(fila).join('')}</tbody></table>`;
+  return html;
 }
 function renderPaso2() {
   const bloqueantes = hayBloqueantes();
@@ -1421,6 +1489,14 @@ function abrirVentanaImpresion(titulo, cuerpoHtml) {
       th{background:#EDEBE4;}
       .ok{color:#2F6B4F;} .err{color:#A33B33;} .exc{color:#5B4B8A;}
       .sep td{background:#EDEBE4; height:6px; padding:0; border:none;}
+      tr.row-anomalia{background:#FBEAE8;}
+      tr.row-excepcion{background:#EFEAF7;}
+      tr.row-aviso{background:#FBF1DD;}
+      .legend-row{display:flex; gap:16px; font-size:11px; color:#54607A; margin:8px 0 12px;}
+      .legend-row .swatch{display:inline-block; width:10px; height:10px; margin-right:5px; vertical-align:middle; border-radius:2px;}
+      .swatch-anomalia{background:#FBEAE8; border:1px solid #A33B33;}
+      .swatch-excepcion{background:#EFEAF7; border:1px solid #5B4B8A;}
+      .swatch-aviso{background:#FBF1DD; border:1px solid #9A6A14;}
       @media print{ .no-print{display:none;} }
     </style></head><body>
     ${cuerpoHtml}
@@ -1431,6 +1507,7 @@ function abrirVentanaImpresion(titulo, cuerpoHtml) {
 function exportarInformePDF() {
   let body = `<h1>Informe de validación — Plaza ${STATE.codigoPlaza}</h1>`;
   body += `<p><b>Reglamento:</b> ${STATE.tipoPlaza === 'ayudante_doctor' ? REGLAMENTOS.ayudante_doctor.fuente : REGLAMENTOS.acuerdo2024.fuente + ' — ' + REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria].label}</p>`;
+  body += `<p><b>Normativa aplicable:</b> <a href="${REGLAMENTOS[STATE.tipoPlaza].normativaUrl}">${REGLAMENTOS[STATE.tipoPlaza].normativaLabel}</a></p>`;
   body += `<h2>Comprobaciones conformes</h2><ul>${STATE.checksOk.map(t => `<li class="ok">✓ ${t}</li>`).join('')}</ul>`;
   body += `<h2>Anomalías y avisos</h2>`;
   if (STATE.issues.length === 0) body += `<p>No se han detectado anomalías.</p>`;
@@ -1438,6 +1515,7 @@ function exportarInformePDF() {
     const cls = i.tipo === 'warn' ? 'exc' : (i.cpuResuelto ? 'exc' : 'err');
     body += `<p class="${cls}"><b>${i.cpuResuelto ? 'Excepción CPU' : (i.tipo === 'warn' ? 'Aviso' : 'Anomalía')} · ${i.tag}</b> (${i.ref})<br>${i.desc}${i.sugerencia ? `<br><i>Sugerencia: ${i.sugerencia}</i>` : ''}${i.cpuResuelto ? `<br><i>Referencia CPU: ${i.cpuRef}</i>` : ''}</p>`;
   });
+  body += renderTablaPropuestaPDF();
   abrirVentanaImpresion(`Informe validación ${STATE.codigoPlaza}`, body);
 }
 function exportarActaPDF() {
