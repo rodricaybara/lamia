@@ -1,1373 +1,181 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Validador de propuestas de Comisión — UPV/EHU</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --paper:#FAF9F6; --panel:#FFFFFF; --ink:#1C2333; --ink-soft:#54607A; --line:#DCD9D0;
-    --accent:#8C2B25; --accent-soft:#F4E8E6;
-    --ok:#2F6B4F; --ok-bg:#E8F1EC;
-    --warn:#9A6A14; --warn-bg:#FBF1DD;
-    --err:#A33B33; --err-bg:#FBEAE8;
-    --exc:#5B4B8A; --exc-bg:#EFEAF7;
-    --radius:3px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans', sans-serif; line-height:1.5;}
-  .wrap{max-width:1040px; margin:0 auto; padding:40px 24px 90px;}
-
-  header.top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:8px;}
-  .brand{display:flex; flex-direction:column; gap:2px;}
-  .brand .eyebrow{font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);}
-  .brand h1{font-family:'Source Serif 4', serif; font-weight:600; font-size:26px; margin:2px 0 0;}
-  .meta-code{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft); text-align:right;}
-
-  .steps{display:flex; gap:0; margin:28px 0 32px; font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.04em;}
-  .step{flex:1; padding:10px 14px; border:1px solid var(--line); border-left:none; color:var(--ink-soft); background:var(--panel); cursor:default;}
-  .step:first-child{border-left:1px solid var(--line);}
-  .step.active{background:var(--ink); color:var(--paper); border-color:var(--ink); font-weight:600;}
-  .step.done{color:var(--ok); font-weight:600; cursor:pointer;}
-
-  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:24px; margin-bottom:24px;}
-  .panel h2{font-family:'Source Serif 4', serif; font-size:18px; font-weight:600; margin:0 0 4px;}
-  .panel .sub{font-size:13px; color:var(--ink-soft); margin:0 0 18px;}
-  .hidden{display:none !important;}
-
-  .type-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:10px;}
-  .type-card{border:1.5px solid var(--line); border-radius:var(--radius); padding:16px 18px; cursor:pointer; background:#FCFBF9;}
-  .type-card.selected{border-color:var(--ink); background:var(--panel); box-shadow:0 0 0 1px var(--ink);}
-  .type-card .radio-row{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
-  .radio-dot{width:16px; height:16px; border-radius:50%; border:1.5px solid var(--ink-soft); flex:0 0 auto; position:relative;}
-  .type-card.selected .radio-dot{border-color:var(--ink);}
-  .type-card.selected .radio-dot::after{content:""; position:absolute; inset:3px; border-radius:50%; background:var(--ink);}
-  .type-card .title{font-weight:600; font-size:14px;}
-  .type-card .legend{font-size:12px; color:var(--ink-soft); line-height:1.5; padding-left:26px; font-family:'IBM Plex Mono', monospace;}
-  .type-card.disabled{opacity:.45; cursor:not-allowed;}
-
-  .subcat-row{display:flex; gap:10px; margin:14px 0 22px;}
-  .subcat-opt{flex:1; border:1.5px solid var(--line); border-radius:var(--radius); padding:11px 14px; display:flex; align-items:center; gap:9px; cursor:pointer; background:#FCFBF9; font-size:13px; font-weight:600;}
-  .subcat-opt.selected{border-color:var(--ink); background:var(--panel); box-shadow:0 0 0 1px var(--ink);}
-  .subcat-opt.disabled{opacity:.4; cursor:not-allowed;}
-  .subcat-opt .radio-dot{width:14px; height:14px;}
-  .tag-soon{font-family:'IBM Plex Mono', monospace; font-size:9px; background:var(--line); color:var(--ink-soft); padding:1px 6px; border-radius:8px; margin-left:auto;}
-
-  .field-group{margin-bottom:20px;}
-  .field-label{display:block; font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-bottom:7px;}
-  .field-label .req{color:var(--err); margin-left:2px;}
-  .code-input{width:280px; max-width:100%; padding:11px 14px; border:1.5px solid var(--line); border-radius:var(--radius); font-family:'IBM Plex Mono', monospace; font-size:15px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; background:#fff; color:var(--ink);}
-  .code-input::placeholder{color:#B7B2A6; font-weight:400; text-transform:none; letter-spacing:normal;}
-  .code-input.error{border-color:var(--err); background:var(--err-bg);}
-  .field-error{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--err); margin-top:7px; font-family:'IBM Plex Mono', monospace;}
-  .lang-row{display:flex; gap:10px;}
-  .lang-option{flex:1; border:1.5px solid var(--line); border-radius:var(--radius); padding:12px 14px; display:flex; align-items:center; gap:10px; cursor:pointer; background:#FCFBF9;}
-  .lang-option.selected{border-color:var(--ink); background:var(--panel); box-shadow:0 0 0 1px var(--ink);}
-  .lang-option .radio-dot{width:15px; height:15px;}
-  .lang-option .lang-label{font-size:13.5px; font-weight:600;}
-
-  .checkbox-row{display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer;}
-  .checkbox-box{width:16px; height:16px; border:1.5px solid var(--ink-soft); border-radius:2px; flex:0 0 auto; position:relative;}
-  .checkbox-box.checked{border-color:var(--ink); background:var(--ink);}
-  .checkbox-box.checked::after{content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;}
-
-  .dropzone{border:1.5px dashed var(--line); border-radius:var(--radius); padding:32px; display:flex; align-items:center; justify-content:space-between; gap:18px; background:#FCFBF9; cursor:pointer;}
-  .dropzone.drag{border-color:var(--ink); background:var(--accent-soft);}
-  .dropzone .info{display:flex; align-items:center; gap:14px;}
-  .file-icon{width:38px; height:46px; border:1.5px solid var(--ink); position:relative; flex:0 0 auto; background:#fff;}
-  .file-icon::after{content:""; position:absolute; top:0; right:0; width:10px; height:10px; background:var(--paper); border-left:1.5px solid var(--ink); border-bottom:1.5px solid var(--ink);}
-  .dropzone .filename{font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:500;}
-  .dropzone .filesub{font-size:12px; color:var(--ink-soft); margin-top:2px;}
-
-  .btn{font-family:'IBM Plex Sans', sans-serif; font-size:13px; font-weight:600; padding:9px 18px; border-radius:var(--radius); border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer;}
-  .btn.secondary{background:#fff; color:var(--ink);}
-  .btn:disabled{opacity:.4; cursor:not-allowed;}
-  .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
-
-  .summary-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); margin-top:18px; border:1px solid var(--line);}
-  .summary-cell{background:var(--panel); padding:14px 16px;}
-  .summary-cell .label{font-family:'IBM Plex Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft);}
-  .summary-cell .value{font-family:'Source Serif 4', serif; font-size:22px; font-weight:600; margin-top:4px;}
-
-  .stamp-row{display:flex; align-items:center; gap:16px; margin:22px 0 18px; flex-wrap:wrap;}
-  .stamp{font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:13px; letter-spacing:.1em; text-transform:uppercase; padding:8px 16px; border:2px solid var(--err); color:var(--err); border-radius:var(--radius); display:inline-block; background:var(--err-bg);}
-  .stamp.ok{border-color:var(--ok); color:var(--ok); background:var(--ok-bg);}
-  .stamp.exc{border-color:var(--exc); color:var(--exc); background:var(--exc-bg);}
-  .stamp-note{font-size:13px; color:var(--ink-soft);}
-
-  .check-ok{display:flex; gap:10px; align-items:flex-start; padding:7px 0; font-size:13px;}
-  .check-ok .mark{color:var(--ok); font-weight:700; font-family:'IBM Plex Mono', monospace;}
-
-  .issue{border:1px solid var(--err); border-left:4px solid var(--err); background:var(--err-bg); border-radius:var(--radius); padding:16px 18px; margin-bottom:14px;}
-  .issue.resolved{border-color:var(--exc); border-left-color:var(--exc); background:var(--exc-bg);}
-  .issue.warn{border-color:var(--warn); border-left-color:var(--warn); background:var(--warn-bg);}
-  .issue .head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:6px; flex-wrap:wrap;}
-  .issue .tag{font-family:'IBM Plex Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--err); font-weight:600;}
-  .issue.resolved .tag{color:var(--exc);}
-  .issue.warn .tag{color:var(--warn);}
-  .issue .ref{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft);}
-  .issue .desc{font-size:14px; margin:4px 0 10px;}
-  .issue .desc b{font-weight:600;}
-  .issue .suggestion{font-size:13px; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; display:flex; gap:8px; margin-bottom:12px;}
-  .issue .suggestion .icon{font-weight:700; color:var(--ink-soft);}
-
-  .cpu-toggle{border-top:1px dashed rgba(0,0,0,.15); padding-top:12px; margin-top:4px;}
-  .cpu-toggle-row{display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer;}
-  .switch{width:34px; height:19px; border-radius:10px; background:var(--line); position:relative; flex:0 0 auto;}
-  .switch::after{content:""; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); transition:left .15s;}
-  .switch.on{background:var(--exc);}
-  .switch.on::after{left:17px;}
-  .cpu-toggle-label{font-size:12.5px; font-weight:600;}
-  .cpu-field{display:flex; gap:8px; align-items:center; font-family:'IBM Plex Mono', monospace; font-size:12px;}
-  .cpu-field input{flex:1; border:1px solid var(--line); border-radius:var(--radius); padding:7px 10px; font-family:'IBM Plex Mono', monospace; font-size:12px; background:#fff;}
-  .cpu-field.filled input{border-color:var(--exc); color:var(--exc); font-weight:600;}
-
-  .export-row{display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:18px; border-top:1px solid var(--line); flex-wrap:wrap; gap:10px;}
-
-  .banner-carried{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ok); background:var(--ok-bg); border:1px solid var(--ok); border-radius:var(--radius); padding:9px 14px; margin-bottom:22px;}
-  .banner-warn2{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn); border-radius:var(--radius); padding:9px 14px; margin-bottom:22px;}
-
-  .balls-section{margin-bottom:24px;}
-  .balls-section h3{font-family:'Source Serif 4', serif; font-size:15px; font-weight:600; margin:0 0 4px;}
-  .balls-section .sub2{font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;}
-  .balls-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
-  .ball{width:42px; height:42px; border-radius:50%; border:1.5px solid var(--ink); display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; background:#fff; position:relative; cursor:text;}
-  .ball input{width:100%; height:100%; border:none; background:transparent; text-align:center; font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; color:var(--ink); outline:none;}
-  .ball .pos{position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:8px; color:var(--ink-soft); background:var(--paper); padding:0 3px;}
-  .ball.err{border-color:var(--err); background:var(--err-bg);}
-  .or-divider{display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.08em; margin:14px 0;}
-  .or-divider::before, .or-divider::after{content:""; flex:1; height:1px; background:var(--line);}
-  .text-input-row{display:flex; gap:10px;}
-  .text-input-row input{flex:1; border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; font-family:'IBM Plex Mono', monospace; font-size:13px;}
-
-  .trace{border-left:2px solid var(--line); margin:22px 0 26px 10px; padding-left:22px;}
-  .trace-item{position:relative; padding-bottom:20px;}
-  .trace-item::before{content:""; position:absolute; left:-27px; top:2px; width:10px; height:10px; border-radius:50%; background:var(--ink); border:2px solid var(--paper); box-shadow:0 0 0 1.5px var(--ink);}
-  .trace-item .t-head{display:flex; gap:10px; align-items:baseline; margin-bottom:3px; flex-wrap:wrap;}
-  .trace-item .t-block{font-family:'IBM Plex Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#fff; background:var(--ink); padding:2px 7px; border-radius:10px;}
-  .trace-item .t-rule{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft);}
-  .trace-item .t-text{font-size:13.5px;}
-  .trace-item .t-text b{font-weight:600; color:var(--accent);}
-
-  table.result{width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;}
-  table.result th{text-align:left; font-family:'IBM Plex Mono', monospace; font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); padding:7px 9px; border-bottom:1.5px solid var(--ink); white-space:nowrap;}
-  table.result td{padding:7px 9px; border-bottom:1px solid var(--line); white-space:nowrap;}
-  table.result .code-cell{font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:11px;}
-  table.result .code-cell.tit{color:var(--ok);}
-  table.result .code-cell.sup{color:var(--ink-soft);}
-  table.result tr.separator td{background:#EDEBE4; height:8px; padding:0; border-bottom:none;}
-  .table-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius);}
-  .table-scroll table.result{border:none;}
-
-  footer.note{margin-top:36px; font-size:12px; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:14px;}
-</style>
-</head>
-<body>
-<div class="wrap" id="app"></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-/* ==========================================================================
-   CONFIGURACIÓN NORMATIVA
-   ========================================================================== */
-
-const REGLAMENTOS = {
-  ayudante_doctor: {
-    label: 'Profesorado Ayudante Doctor',
-    legend: 'Reglamento del proceso de selección del Profesorado Ayudante Doctor · Acuerdo Consejo de Gobierno, 11 junio 2024',
-    fuente: 'Reglamento Ayudante Doctor',
-    bloqueASize: 8, bloqueBSize: 9,
-    bloqueAExclusivoUPV: true,
-    subcategorias: null,
-  },
-  acuerdo2024: {
-    label: 'Catedrático · Pleno · Titular · Agregado',
-    legend: 'Reglamento de concursos de acceso a Cuerpos Docentes Universitarios y selección y contratación de Profesorado Pleno y Agregado · Acuerdo 26 septiembre 2024 (BOPV 10/10/2024)',
-    fuente: 'Reglamento 26/09/2024',
-    bloqueASize: 8, bloqueBSize: 9,
-    bloqueAExclusivoUPV: false,
-    subcategorias: {
-      // categoriasPermitidas usa raíces léxicas (normalizadas sin acentos), no la
-      // palabra completa: en los Excel reales la categoría llega con variantes de
-      // género/prefijo como "Profesor Catedratico" o "Profesora Catedratica", y
-      // una clave como "CATEDRATICO" no reconoce la forma femenina "CATEDRATICA"
-      // por subcadena (difieren en la última letra). Con la raíz "CATEDRATIC" se
-      // cubren ambas formas.
-      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a de Universidad', enabled: true },
-      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a de Universidad o Profesorado Pleno', enabled: true },
-      titular:     { label: 'Titular',        categoriasPermitidas: null, categoriasLabel: null, enabled: false },
-      agregado:    { label: 'Agregado',       categoriasPermitidas: null, categoriasLabel: null, enabled: false },
-    },
-  },
-};
-
-// Categorías admitidas en Bloque B (externos) para Ayudante Doctor: art. 3.1.b
-const CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR = ['CATEDRÁTICO', 'CATEDRATICO', 'TITULAR'];
-
-/* ==========================================================================
-   ESTADO GLOBAL
-   ========================================================================== */
-
-const STATE = {
-  step: 1,
-  tipoPlaza: null,          // 'ayudante_doctor' | 'acuerdo2024'
-  subcategoria: null,       // 'catedratico' | 'pleno' (solo si acuerdo2024)
-  codigoPlaza: '',
-  codigoPlazaExcel: null,   // detectado en el título del Excel
-  perfilLinguistico: 'bilingue', // 'no_bilingue' | 'bilingue'
-  areaFuertementeFeminizada: false,
-  personas: [],             // filas parseadas del Excel
-  parseErrors: [],
-  fileName: '',
-  tituloExcel: '',
-  codigoPlazaAttempted: false,
-  issues: [],                // resultado de validación: [{id, tipo:'error'|'warn', tag, ref, desc, sugerencia, cpuResuelto, cpuRef}]
-  checksOk: [],
-  bolas: Array(17).fill(''),
-  bolasA: Array(8).fill(''),
-  bolasB: Array(9).fill(''),
-  resultado: null,           // {listaReordenada, titulares, suplentes, traza:[]}
-};
-
-/* ==========================================================================
-   PARSEO DEL EXCEL
-   Fila 1: título con el código de la plaza.
-   Fila 2: cabeceras (se detectan por nombre; si falta alguna, se usa la posición histórica).
-   Fila 3 en adelante: datos.
-   Orden de columnas:
-   DNI/NAN; Nº; 1er Apellido; 2º Apellido; Nombre; Universidad; Cuerpo-Categoría;
-   Situación; Área(código); Área(literal); Perfil lingüístico; Sexo
-   ========================================================================== */
-
-function extraerCodigoDeTitulo(tituloTexto) {
-  if (!tituloTexto) return null;
-  const m = tituloTexto.toUpperCase().match(/PLAZA\s+([A-Z0-9\-\/]+)\s*$/);
-  return m ? m[1].trim() : null;
-}
-
-function normalizarCabecera(txt) {
-  return String(txt || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/ñ/g, 'n')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-const COLUMNAS_PROPUESTA = {
-  dni: {
-    fallback: 0,
-    aliases: ['dni nan', 'dni', 'nan', 'documento', 'documento identidad'],
-  },
-  numero: {
-    fallback: 1,
-    aliases: ['n', 'no', 'num', 'numero', 'n orden', 'numero orden', 'orden'],
-  },
-  apellido1: {
-    fallback: 2,
-    aliases: ['1er apellido', 'primer apellido', 'apellido 1', '1 apellido', 'primer apellidos'],
-  },
-  apellido2: {
-    fallback: 3,
-    aliases: ['2o apellido', '2 apellido', 'segundo apellido', 'apellido 2', 'segundo apellidos'],
-  },
-  nombre: {
-    fallback: 4,
-    aliases: ['nombre', 'izena'],
-  },
-  universidad: {
-    fallback: 5,
-    aliases: ['universidad', 'unibertsitatea', 'universidad procedencia', 'universidad origen'],
-  },
-  categoria: {
-    fallback: 6,
-    aliases: ['cuerpo categoria', 'cuerpo categoria kidegoa kategoria', 'categoria', 'cuerpo', 'kidegoa kategoria'],
-  },
-  situacion: {
-    fallback: 7,
-    aliases: ['situacion', 'situacion egoera', 'egoera'],
-  },
-  areaCodigo: {
-    fallback: 8,
-    aliases: ['area codigo', 'area conocimiento codigo', 'area conocimiento codigo jakintza arloa kodea', 'jakintza arloa kodea'],
-  },
-  areaNombre: {
-    fallback: 9,
-    aliases: ['area literal', 'area conocimiento literal', 'area conocimiento literal jakintza arloa literala', 'jakintza arloa literala'],
-  },
-  perfil: {
-    fallback: 10,
-    aliases: ['perfil linguistico', 'perfil ling', 'perfil linguistico hizkuntz ezkakizuna', 'hizkuntz ezkakizuna'],
-  },
-  sexo: {
-    fallback: 11,
-    aliases: ['sexo', 'sexo sexua', 'sexua', 'genero'],
-  },
-};
-
-function crearIndiceColumnas(cabeceras) {
-  const normalizadas = cabeceras.map(normalizarCabecera);
-  const indices = {};
-  Object.entries(COLUMNAS_PROPUESTA).forEach(([campo, cfg]) => {
-    const aliasNormalizados = cfg.aliases.map(normalizarCabecera);
-    let idx = normalizadas.findIndex(h => aliasNormalizados.includes(h));
-    if (idx === -1) {
-      idx = normalizadas.findIndex(h =>
-        aliasNormalizados.some(a => a.length >= 4 && ` ${h} `.includes(` ${a} `))
-      );
-    }
-    indices[campo] = idx === -1 ? cfg.fallback : idx;
-  });
-  return indices;
-}
-
-function celda(r, indices, campo) {
-  const idx = indices[campo];
-  return idx >= 0 ? r[idx] : '';
-}
-
-function parseWorkbookFile(arrayBuffer) {
-  const wb = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-  const errors = [];
-  if (rows.length < 3) {
-    errors.push('El archivo no tiene el formato esperado (se esperaban al menos 3 filas: título, cabecera y datos).');
-    return { titulo: '', codigoDetectado: null, personas: [], errors };
-  }
-
-  const filaTitulo = (rows[0] || []).join(' ').trim();
-  const codigoDetectado = extraerCodigoDeTitulo(filaTitulo);
-  const indices = crearIndiceColumnas(rows[1] || []);
-
-  const personas = [];
-  for (let i = 2; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r || r.every(c => String(c).trim() === '')) continue; // fila vacía
-    const dni = celda(r, indices, 'dni');
-    const numero = celda(r, indices, 'numero');
-    const apellido1 = celda(r, indices, 'apellido1');
-    const apellido2 = celda(r, indices, 'apellido2');
-    const nombre = celda(r, indices, 'nombre');
-    const universidad = celda(r, indices, 'universidad');
-    const categoria = celda(r, indices, 'categoria');
-    const situacion = celda(r, indices, 'situacion');
-    const areaCodigo = celda(r, indices, 'areaCodigo');
-    const areaNombre = celda(r, indices, 'areaNombre');
-    const perfil = celda(r, indices, 'perfil');
-    const sexo = celda(r, indices, 'sexo');
-    if (numero === '' || numero === undefined) continue;
-    personas.push({
-      dni: String(dni || '').trim(),
-      numero: parseInt(numero, 10),
-      apellido1: String(apellido1 || '').trim(),
-      apellido2: String(apellido2 || '').trim(),
-      nombre: String(nombre || '').trim(),
-      universidad: String(universidad || '').trim(),
-      categoria: String(categoria || '').trim().toUpperCase(),
-      situacion: String(situacion || '').trim().toUpperCase(),
-      areaCodigo: String(areaCodigo || '').trim(),
-      areaNombre: String(areaNombre || '').trim(),
-      perfil: String(perfil || '').trim().toUpperCase(),
-      sexo: String(sexo || '').trim().toUpperCase(),
-    });
-  }
-  if (personas.length === 0) {
-    errors.push('No se han detectado filas de datos a partir de la fila 3. Comprueba que el archivo sigue la plantilla estándar.');
-  }
-  return { titulo: filaTitulo, codigoDetectado, personas, errors };
-}
-
-/* ==========================================================================
-   UTILIDADES DE DOMINIO
-   ========================================================================== */
-
-function isUPV(universidad) {
-  const u = String(universidad || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-  const compacto = u.replace(/\s+/g, '');
-  return compacto.includes('UPV/EHU') ||
-    compacto.includes('UPV-EHU') ||
-    compacto.includes('UPVEHU') ||
-    u === 'EHU' ||
-    u.includes('UNIVERSIDAD DEL PAIS VASCO') ||
-    u.includes('EUSKAL HERRIKO UNIBERTSITATEA');
-}
-function isBilingue(perfil) {
-  const p = String(perfil || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .trim();
-  return p === 'BILINGUE' || p === 'TRILINGUE';
-}
-function maskDNI(dni) {
-  if (!dni || dni.length < 4) return '••••••••';
-  return '•'.repeat(dni.length - 1) + dni.slice(-1);
-}
-function nombreCompleto(p) {
-  return [p.nombre, p.apellido1, p.apellido2].filter(Boolean).join(' ');
-}
-function normalizarTexto(txt) {
-  return String(txt || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim();
-}
-function esCategoria(p, claves) {
-  const c = normalizarTexto(p.categoria);
-  return claves.some(k => c.includes(k));
-}
-function esCatedratico(p) {
-  return esCategoria(p, ['CATEDRATIC']);
-}
-function esPleno(p) {
-  return esCategoria(p, ['PLEN']);
-}
-function getBloquesPropuesta(personas, tipoPlaza) {
-  if (tipoPlaza === 'acuerdo2024') {
-    return {
-      bloqueA: personas.filter(p => p.numero >= 1 && p.numero <= 8),
-      bloqueB: personas.filter(p => p.numero >= 9 && p.numero <= 17),
-    };
-  }
-  return {
-    bloqueA: personas.filter(p => isUPV(p.universidad)),
-    bloqueB: personas.filter(p => !isUPV(p.universidad)),
-  };
-}
-function personasOrdenadasPorNumero(personas) {
-  return personas.slice().sort((a, b) => a.numero - b.numero);
-}
-
-/* ==========================================================================
-   MOTOR DE SORTEO (validado con Node antes de incrustarlo aquí)
-   ========================================================================== */
-
-function reordenar(personas, ordenBolas) {
-  const byNum = new Map(personas.map(p => [p.numero, p]));
-  return ordenBolas.map(n => byNum.get(n)).filter(Boolean);
-}
-
-function elegePareja(pool, requiereBilingueEnPrimera, segundoNoUPV) {
-  pool = pool.slice();
-  let primera;
-  if (requiereBilingueEnPrimera) {
-    // Caso bilingüe: primera persona UPV/EHU con capacidad bilingüe/trilingüe (art. 13.2.1.a.1)
-    primera = pool.find(p => isBilingue(p.perfil)) || pool[0] || null;
-  } else if (segundoNoUPV) {
-    // Caso Acuerdo 2024 no bilingüe: primera persona debe ser de la UPV/EHU (art. 13.2.2.a.1)
-    primera = pool.find(p => isUPV(p.universidad)) || pool[0] || null;
-  } else {
-    primera = pool[0] || null;
-  }
-  if (!primera) return { pareja: [], restante: pool };
-  pool = pool.filter(p => p !== primera);
-
-  let candidatos = pool;
-  if (segundoNoUPV) candidatos = candidatos.filter(p => !isUPV(p.universidad));
-
-  let segunda = candidatos.find(p => p.sexo !== primera.sexo);
-  if (!segunda) segunda = candidatos[0] || pool[0] || null;
-  if (segunda) {
-    pool = pool.filter(p => p !== segunda);
-    return { pareja: [primera, segunda], restante: pool };
-  }
-  return { pareja: [primera], restante: pool };
-}
-
-function bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza) {
-  let pool = listaReordenada.filter(p => isUPV(p.universidad));
-  const r1 = elegePareja(pool, bilingue, false);
-  traza.push({ bloque: 'A', regla: 'art. 4.2.a', texto: describePareja(r1.pareja, bilingue, false, 'Pareja titular') });
-  let suplentes = [];
-  let poolN = r1.restante;
-  for (let i = 0; i < 2; i++) {
-    const rn = elegePareja(poolN, bilingue, false);
-    traza.push({ bloque: 'A', regla: 'art. 4.2.b', texto: describePareja(rn.pareja, bilingue, false, `${i + 1}ª pareja suplente`) });
-    suplentes = suplentes.concat(rn.pareja);
-    poolN = rn.restante;
-  }
-  return { titulares: r1.pareja, suplentes };
-}
-
-function bloqueA_Acuerdo2024(listaReordenada, bilingue, traza) {
-  if (bilingue) {
-    return bloqueA_AyudanteDoctor(listaReordenada, true, traza);
-  }
-  let pool = listaReordenada.slice();
-  const r1 = elegePareja(pool, false, true);
-  traza.push({ bloque: 'A', regla: 'art. 13.2.2.a', texto: describePareja(r1.pareja, false, true, 'Pareja titular') });
-  let suplentes = [];
-  let poolN = r1.restante;
-  for (let i = 0; i < 2; i++) {
-    const rn = elegePareja(poolN, false, true);
-    traza.push({ bloque: 'A', regla: 'art. 13.2.2.b', texto: describePareja(rn.pareja, false, true, `${i + 1}ª pareja suplente`) });
-    suplentes = suplentes.concat(rn.pareja);
-    poolN = rn.restante;
-  }
-  return { titulares: r1.pareja, suplentes };
-}
-
-function bloqueB_alternando(listaReordenada, nTotal, reglaRef, traza) {
-  const externos = listaReordenada.filter(p => !isUPV(p.universidad));
-  const seleccion = [];
-  let generoAnterior = null;
-  while (seleccion.length < nTotal && seleccion.length < externos.length) {
-    let candidato;
-    if (generoAnterior === null) {
-      candidato = externos.find(p => !seleccion.includes(p));
-      traza.push({ bloque: 'B', regla: reglaRef, texto: `Primera persona externa de la lista reordenada → <b>${nombreCompleto(candidato)}</b>.` });
-    } else {
-      candidato = externos.find(p => !seleccion.includes(p) && p.sexo !== generoAnterior);
-      if (!candidato) {
-        candidato = externos.find(p => !seleccion.includes(p));
-        traza.push({ bloque: 'B', regla: reglaRef, texto: `Sin candidato de género distinto disponible; se toma la primera persona restante → <b>${nombreCompleto(candidato)}</b>.` });
-      } else {
-        traza.push({ bloque: 'B', regla: reglaRef, texto: `Reinicio del barrido, primera persona de género distinto → <b>${nombreCompleto(candidato)}</b>.` });
-      }
-    }
-    seleccion.push(candidato);
-    generoAnterior = candidato.sexo;
-  }
-  return { titulares: seleccion.slice(0, 3), suplentes: seleccion.slice(3, 6) };
-}
-
-function describePareja(pareja, bilingueReq, segundoNoUPV, etiqueta) {
-  if (pareja.length === 0) return `${etiqueta}: no ha sido posible completar la selección (lista insuficiente).`;
-  const [p1, p2] = pareja;
-  let txt = `${etiqueta}: `;
-  txt += bilingueReq
-    ? `primera persona UPV/EHU <b>bilingüe/trilingüe</b> de la lista restante → <b>${nombreCompleto(p1)}</b>`
-    : `primera persona ${segundoNoUPV ? 'UPV/EHU ' : ''}de la lista restante → <b>${nombreCompleto(p1)}</b>`;
-  if (p2) {
-    txt += `; a continuación, primera persona de género distinto${segundoNoUPV ? ' y externa a la UPV/EHU' : ''} → <b>${nombreCompleto(p2)}</b>.`;
-  } else {
-    txt += `. No ha sido posible completar la pareja con el criterio general; se aplica la regla subsidiaria.`;
-  }
-  return txt;
-}
-
-function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bilingue) {
-  const traza = [];
-  const listaReordenada = reordenar(personas, ordenBolas);
-  let a, b;
-  if (tipoPlaza === 'ayudante_doctor') {
-    // art. 4.1: sorteo único combinado. Bloque A (UPV) y Bloque B (externos) se
-    // extraen de la MISMA lista reordenada mediante filtrado por afiliación;
-    // como en este reglamento el Bloque A es exclusivamente UPV/EHU, no hay
-    // solapamiento posible entre ambos filtrados.
-    a = bloqueA_AyudanteDoctor(listaReordenada, bilingue, traza);
-    b = bloqueB_alternando(listaReordenada, 6, 'art. 4.3', traza);
-  } else {
-    // art. 13.1: se realizan dos sorteos independientes, uno por bloque. En la
-    // práctica se hace un único sorteo de 17 bolas y se separan las listas
-    // reordenadas de cada bloque conservando el orden de extracción dentro de
-    // cada una (ver resumen_composicion_catedratico_no_bilingue.md, apdo. 2).
-    // Es imprescindible separar ambas listas ANTES de aplicar el algoritmo de
-    // cada bloque: si se le pasa a cada bloque la lista combinada de 17, el
-    // algoritmo del Bloque A puede alcanzar personas numeradas en el rango del
-    // Bloque B (9-17) —y viceversa—, y el Bloque B puede volver a seleccionar
-    // a alguien que el Bloque A ya usó, generando personas duplicadas en la
-    // composición final (bug detectado con la propuesta PLC8L1-D00166-2, Pleno
-    // no bilingüe: el Bloque A llegó a "pescar" a la persona nº16, que
-    // pertenece al Bloque B, y el Bloque B la volvió a seleccionar por su
-    // cuenta).
-    const listaReordenadaA = listaReordenada.filter(p => p.numero >= 1 && p.numero <= 8);
-    const listaReordenadaB = listaReordenada.filter(p => p.numero >= 9 && p.numero <= 17);
-    a = bloqueA_Acuerdo2024(listaReordenadaA, bilingue, traza);
-    b = bloqueB_alternando(listaReordenadaB, 6, 'art. 13.3.a', traza);
-  }
-  return {
-    listaReordenada,
-    titulares: [...a.titulares, ...b.titulares],
-    suplentes: [...a.suplentes, ...b.suplentes],
-    traza,
-  };
-}
-</script>
-
-<script>
-/* ==========================================================================
-   MOTOR DE VALIDACIÓN
-   ========================================================================== */
-
-function validarPropuesta() {
-  const issues = [];
-  const checksOk = [];
-  const personas = STATE.personas;
-  const reglamento = REGLAMENTOS[STATE.tipoPlaza];
-  const bilingueReq = STATE.perfilLinguistico === 'bilingue';
-
-  let addIssue = (id, tipo, tag, ref, desc, sugerencia) => {
-    issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '' });
-  };
-  let addOk = (texto) => checksOk.push(texto);
-
-  const nums = personas.map(p => p.numero).sort((a, b) => a - b);
-  const esperados = Array.from({ length: 17 }, (_, i) => i + 1);
-  const numsOk = nums.length === 17 && esperados.every((v, i) => nums[i] === v);
-  if (numsOk) addOk('Numeración: 17 registros, del 1 al 17, sin huecos ni duplicados.');
-  else addIssue('numeracion', 'error', 'Numeración incorrecta', '—',
-    `Se han detectado ${personas.length} filas y la numeración no es 1–17 consecutiva sin duplicados.`,
-    'Revisa el Excel de origen: cada fila debe tener un número de orden único de 1 a 17.');
-
-  // Bloque A/B: para Acuerdo 2024 se determinan por número de orden (1-8 / 9-17),
-  // conforme al art. 12.1, y no por afiliación institucional, ya que el art. 12.1.A
-  // permite completar el Bloque A con personal externo cuando no hay suficientes
-  // personas de la UPV/EHU. Para Ayudante Doctor, en cambio, el Bloque A es
-  // exclusivamente UPV/EHU por afiliación (getBloquesPropuesta lo resuelve para
-  // ambos casos de forma consistente con el resto de la aplicación).
-  const { bloqueA, bloqueB } = getBloquesPropuesta(personas, STATE.tipoPlaza);
-
-  if (reglamento.bloqueAExclusivoUPV) {
-    if (bloqueA.length === 8 && bloqueB.length === 9) {
-      addOk(`Tamaño de la propuesta: 8 UPV/EHU + 9 externos (correcto).`);
-    } else {
-      addIssue('tamano', 'error', 'Tamaño de bloques incorrecto', 'art. 3.1',
-        `Se esperaban 8 personas de la UPV/EHU y 9 externas; se han detectado ${bloqueA.length} de UPV/EHU y ${bloqueB.length} externas.`,
-        'Ajusta la propuesta para que cumpla la proporción 8+9 antes de continuar.');
-    }
-  } else {
-    if (personas.length === 17 && bloqueB.length === 9) {
-      addOk(`Tamaño de la propuesta: 17 personas totales, 9 en el Bloque B (nº 9–17) (correcto).`);
-      const upvEnA = bloqueA.filter(p => isUPV(p.universidad)).length;
-      const upvEnB = bloqueB.filter(p => isUPV(p.universidad)).length;
-      if (upvEnB > 0) {
-        addIssue('upv-en-b', 'error', 'Persona UPV/EHU en el Bloque B', 'art. 12.1.B',
-          `${upvEnB} persona(s) de la UPV/EHU figuran en el Bloque B (nº 9–17), que debe estar compuesto exclusivamente por personal externo.`,
-          'Sustituye a las personas de la UPV/EHU del Bloque B por personal externo, o corrige su numeración si su posición correcta es el Bloque A.');
-      }
-      if (bilingueReq) {
-        if (upvEnA >= 2) addOk(`Bloque A: ${upvEnA} personas de la UPV/EHU (mínimo 2 exigido para completar con externos si fuera necesario).`);
-        else addIssue('upv-min', 'error', 'Insuficientes miembros UPV/EHU', 'art. 12.1.A',
-          `Solo hay ${upvEnA} personas de la UPV/EHU en el Bloque A; se exige un mínimo de 2.`,
-          'Añade personas de la UPV/EHU al Bloque A hasta alcanzar al menos 2.');
-      } else {
-        if (upvEnA >= 2 && upvEnA <= 4) addOk(`Bloque A (no bilingüe): ${upvEnA} personas de la UPV/EHU (rango 2–4 exigido).`);
-        else addIssue('upv-rango', 'error', 'Proporción UPV/EHU fuera de rango', 'art. 12.3',
-          `En plaza no bilingüe, el Bloque A debe tener entre 2 y 4 personas de la UPV/EHU; se han detectado ${upvEnA}.`,
-          'Ajusta la propuesta para que el número de personas UPV/EHU en el Bloque A esté entre 2 y 4.');
-      }
-    } else {
-      addIssue('tamano', 'error', 'Tamaño de bloques incorrecto', 'art. 12.1',
-        `Se esperaban 17 personas en total con 9 en el Bloque B; se han detectado ${personas.length} en total y ${bloqueB.length} en el Bloque B.`,
-        'Ajusta la propuesta para que cumpla la proporción exigida antes de continuar.');
-    }
-  }
-
-  const noActivos = personas.filter(p => p.situacion !== 'ACTIVO');
-  if (noActivos.length === 0) addOk('Situación administrativa: las 17 personas constan como "Activo".');
-  else addIssue('situacion', 'error', 'Situación administrativa no válida', 'art. 11.9',
-    `${noActivos.length} persona(s) no constan en situación "Activo": ${noActivos.map(p => nombreCompleto(p)).join(', ')}.`,
-    'Las personas jubiladas o en situaciones distintas a servicio activo no pueden formar parte de la Comisión; sustitúyelas.');
-
-  const areas = [...new Set(personas.map(p => p.areaCodigo))];
-  if (areas.length === 1) addOk(`Área de conocimiento: las 17 personas pertenecen al área ${areas[0]}.`);
-  else issues.push({
-    id: 'area', tipo: 'warn', tag: 'Aviso · Requiere criterio', ref: 'art. 12.1',
-    desc: `Se han detectado ${areas.length} áreas de conocimiento distintas (${areas.join(', ')}). Puede deberse al uso de áreas afines, lo cual requiere justificación por proximidad.`,
-    sugerencia: 'Verifica que el uso de áreas afines está justificado; en caso de duda, consulta con el Vicerrectorado de PDI.',
-    cpuResuelto: false, cpuRef: '',
-  });
-
-  function checkGenero(lista, nombreBloque, minimo) {
-    const mujeres = lista.filter(p => p.sexo === 'MUJER').length;
-    const hombres = lista.filter(p => p.sexo === 'HOMBRE').length;
-    const targetSexo = STATE.areaFuertementeFeminizada ? 'hombres' : 'mujeres';
-    const count = STATE.areaFuertementeFeminizada ? hombres : mujeres;
-    if (count >= minimo) {
-      addOk(`Mínimo de ${targetSexo} en ${nombreBloque}: ${count} (≥${minimo} requerido).`);
-    } else {
-      addIssue(`genero-${nombreBloque}`, 'error', `Paridad insuficiente en ${nombreBloque}`,
-        STATE.tipoPlaza === 'ayudante_doctor' ? 'art. 3.1' : 'art. 12.1',
-        `Solo hay ${count} ${targetSexo} en ${nombreBloque}; se exige un mínimo de ${minimo}${STATE.areaFuertementeFeminizada ? ' (regla invertida por área fuertemente feminizada)' : ''}.`,
-        `Sustituye a alguna persona para alcanzar el mínimo de ${minimo} ${targetSexo} en ${nombreBloque}.`);
-    }
-  }
-  checkGenero(bloqueA, 'Bloque A', 4);
-  checkGenero(bloqueB, 'Bloque B', 4);
-
-  if (bilingueReq) {
-    const bilinguesA = bloqueA.filter(p => isBilingue(p.perfil)).length;
-    if (STATE.tipoPlaza === 'ayudante_doctor') {
-      if (bilinguesA >= 5) addOk(`Capacidad bilingüe/trilingüe en Bloque A: ${bilinguesA} de ${bloqueA.length} (≥5 requerido para plaza bilingüe/trilingüe).`);
-      else addIssue('bilingue-a', 'error', 'Capacidad bilingüe/trilingüe insuficiente', 'art. 3.1.a',
-        `Solo ${bilinguesA} de ${bloqueA.length} personas del Bloque A tienen capacidad bilingüe/trilingüe; se exige un mínimo de 5.`,
-        'Sustituye a alguna persona del Bloque A por otra con capacidad para impartir docencia en euskera.');
-    } else {
-      if (bilinguesA === bloqueA.length && bloqueA.length > 0) addOk(`Capacidad bilingüe/trilingüe en Bloque A: ${bilinguesA} de ${bloqueA.length} (100% requerido para plaza bilingüe/trilingüe).`);
-      else addIssue('bilingue-a', 'error', 'Capacidad bilingüe/trilingüe insuficiente', 'art. 12.2',
-        `${bilinguesA} de ${bloqueA.length} personas del Bloque A tienen capacidad bilingüe/trilingüe; en este Reglamento se exige que TODAS las personas del Bloque A sean bilingües/trilingües.`,
-        'Sustituye a las personas del Bloque A sin capacidad bilingüe/trilingüe por otras que sí la tengan.');
-    }
-  }
-
-  if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const noValidos = bloqueB.filter(p => !CATEGORIAS_BLOQUE_B_AYUDANTE_DOCTOR.includes(p.categoria));
-    if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad.');
-    else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
-      `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}, ${p.universidad}) figura en el Bloque B, que exige categoría equiparable a Catedrático/a o Titular de Universidad.`,
-      'Sustituir por una persona con categoría de Catedrático/a o Titular de Universidad, del área correspondiente o de área afín si no hay disponibilidad.'));
-  } else {
-    const sub = REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria];
-    const permitidas = sub.categoriasPermitidas;
-    const etiquetaCategorias = sub.categoriasLabel || permitidas.join(' o ');
-    // Comparación por subcadena normalizada (sin acentos, mayúsculas) usando
-    // raíces léxicas en vez de igualdad exacta: en los Excel reales la categoría
-    // llega como "PROFESOR CATEDRATICO", "PROFESORA CATEDRATICA", "PROFESOR
-    // PLENO", etc., con el sustantivo y el género flexionados, no como la
-    // palabra clave aislada (ni siquiera "CATEDRATICO" reconoce por subcadena
-    // la forma femenina "CATEDRATICA", de ahí la raíz "CATEDRATIC").
-    const noValidos = personas.filter(p => !esCategoria(p, permitidas));
-    if (noValidos.length === 0) addOk(`Categorías: todas las personas cumplen la categoría exigida para plaza de ${sub.label} (${etiquetaCategorias}).`);
-    else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 12.4',
-      `Fila ${p.numero} — <b>${nombreCompleto(p)}</b> (${p.categoria}) no cumple la categoría exigida para plaza de ${sub.label} (se requiere: ${etiquetaCategorias}).`,
-      `Sustituir por una persona con categoría ${etiquetaCategorias}.`));
-  }
-
-  if (STATE.codigoPlazaExcel) {
-    if (STATE.codigoPlazaExcel.toUpperCase() === STATE.codigoPlaza.toUpperCase()) {
-      addOk('El código de plaza detectado en el título del Excel coincide con el introducido manualmente.');
-    } else {
-      addIssue('codigo-mismatch', 'warn', 'Aviso · Código de plaza no coincide', '—',
-        `El código introducido manualmente (<b>${STATE.codigoPlaza}</b>) no coincide con el detectado en el título del Excel (<b>${STATE.codigoPlazaExcel}</b>).`,
-        'Comprueba que has cargado el archivo correcto o corrige el código introducido.');
-    }
-  }
-
-  STATE.issues = issues;
-  STATE.checksOk = checksOk;
-}
-
-function hayBloqueantes() {
-  return STATE.issues.some(i => i.tipo === 'error' && !i.cpuResuelto);
-}
-</script>
-
-<script>
-/* ==========================================================================
-   RENDER — helpers generales
-   ========================================================================== */
-
-function el(html) {
-  const t = document.createElement('template');
-  t.innerHTML = html.trim();
-  return t.content.firstElementChild;
-}
-
-function renderStepsBar() {
-  const labels = ['Tipo de plaza y carga', 'Validación', 'Sorteo y composición'];
-  return `<div class="steps">${labels.map((l, i) => {
-    const n = i + 1;
-    let cls = 'step';
-    if (n === STATE.step) cls += ' active';
-    else if (n < STATE.step) cls += ' done';
-    return `<div class="${cls}" ${n < STATE.step ? `onclick="goToStep(${n})"` : ''}><span class="n">0${n}</span> ${l}</div>`;
-  }).join('')}</div>`;
-}
-
-function goToStep(n) {
-  if (n === 3 && (STATE.personas.length === 0)) return;
-  STATE.step = n;
-  render();
-}
-
-function render() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <header class="top">
-      <div class="brand">
-        <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
-        <h1>Validador de propuestas de Comisión</h1>
-      </div>
-      <div class="meta-code">v1.0</div>
-    </header>
-    ${renderStepsBar()}
-    ${STATE.step === 1 ? renderPaso1() : ''}
-    ${STATE.step === 2 ? renderPaso2() : ''}
-    ${STATE.step === 3 ? renderPaso3() : ''}
-    <footer class="note">
-      Herramienta de apoyo administrativo. Todo el procesamiento ocurre en tu navegador: ningún dato
-      personal de las candidaturas se envía a ningún servidor. Verifica siempre los resultados antes
-      de su incorporación al expediente oficial.
-    </footer>
-  `;
-  wireEvents();
-}
-
-/* ==========================================================================
-   PASO 1
-   ========================================================================== */
-
-function renderPaso1() {
-  const codigoError = STATE.codigoPlazaAttempted && !STATE.codigoPlaza;
-  return `
-  <section class="panel">
-    <h2>1 · Tipo de plaza y propuesta</h2>
-    <p class="sub">Selecciona el reglamento aplicable, indica el código de la plaza y carga el Excel de la propuesta del Departamento.</p>
-
-    <div class="type-grid">
-      <div class="type-card ${STATE.tipoPlaza === 'ayudante_doctor' ? 'selected' : ''}" onclick="setTipoPlaza('ayudante_doctor')">
-        <div class="radio-row"><span class="radio-dot"></span><span class="title">Profesorado Ayudante Doctor</span></div>
-        <div class="legend">${REGLAMENTOS.ayudante_doctor.legend}</div>
-      </div>
-      <div class="type-card ${STATE.tipoPlaza === 'acuerdo2024' ? 'selected' : ''}" onclick="setTipoPlaza('acuerdo2024')">
-        <div class="radio-row"><span class="radio-dot"></span><span class="title">Catedrático · Pleno · Titular · Agregado</span></div>
-        <div class="legend">${REGLAMENTOS.acuerdo2024.legend}</div>
-      </div>
-    </div>
-
-    ${STATE.tipoPlaza === 'acuerdo2024' ? `
-    <div class="subcat-row">
-      ${Object.entries(REGLAMENTOS.acuerdo2024.subcategorias).map(([key, sub]) => `
-        <div class="subcat-opt ${STATE.subcategoria === key ? 'selected' : ''} ${!sub.enabled ? 'disabled' : ''}"
-             ${sub.enabled ? `onclick="setSubcategoria('${key}')"` : ''}>
-          <span class="radio-dot"></span><span>${sub.label}</span>
-          ${!sub.enabled ? '<span class="tag-soon">v1.1</span>' : ''}
-        </div>
-      `).join('')}
-    </div>` : ''}
-
-    <div class="field-group">
-      <label class="field-label">Código de la plaza <span class="req">*obligatorio</span></label>
-      <input id="codigoPlazaInput" class="code-input ${codigoError ? 'error' : ''}" type="text"
-             value="${STATE.codigoPlaza}" placeholder="EJ. AGC8L1-D00036-31">
-      <p style="font-size:11.5px; color:var(--ink-soft); margin:6px 0 0;">Se convierte automáticamente a mayúsculas al escribir.</p>
-      ${codigoError ? '<div class="field-error">⚠ Introduce el código de la plaza para continuar.</div>' : ''}
-    </div>
-
-    <div class="field-group">
-      <label class="field-label">Perfil lingüístico de la plaza</label>
-      <div class="lang-row">
-        <div class="lang-option ${STATE.perfilLinguistico === 'no_bilingue' ? 'selected' : ''}" onclick="setPerfil('no_bilingue')">
-          <span class="radio-dot"></span><span class="lang-label">No bilingüe</span>
-        </div>
-        <div class="lang-option ${STATE.perfilLinguistico === 'bilingue' ? 'selected' : ''}" onclick="setPerfil('bilingue')">
-          <span class="radio-dot"></span><span class="lang-label">Bilingüe / Trilingüe</span>
-        </div>
-      </div>
-      <p style="font-size:11.5px; color:var(--ink-soft); margin:8px 0 0;">
-        A efectos de composición de la Comisión, el Reglamento no distingue entre perfil bilingüe y trilingüe.
-      </p>
-    </div>
-
-    <div class="field-group">
-      <label class="checkbox-row" onclick="toggleFeminizada()">
-        <span class="checkbox-box ${STATE.areaFuertementeFeminizada ? 'checked' : ''}"></span>
-        <span>El área ha sido declarada "fuertemente feminizada" por la Dirección para la Igualdad (&gt;80% mujeres) — invierte el mínimo de género a hombres.</span>
-      </label>
-    </div>
-
-    <div class="field-group">
-      <label class="field-label">Excel de la propuesta</label>
-      <div id="dropzone" class="dropzone">
-        <div class="info">
-          <div class="file-icon"></div>
-          <div>
-            <div class="filename">${STATE.fileName || 'Ningún archivo cargado'}</div>
-            <div class="filesub">${STATE.personas.length > 0
-              ? `Título detectado: «${STATE.tituloExcel}» · ${STATE.personas.length} filas de datos`
-              : 'Arrastra aquí el archivo .xlsx o haz clic para seleccionarlo'}</div>
-          </div>
-        </div>
-        <button class="btn secondary" type="button" onclick="document.getElementById('fileInput').click()">
-          ${STATE.personas.length > 0 ? 'Cambiar archivo' : 'Seleccionar archivo'}
-        </button>
-        <input id="fileInput" type="file" accept=".xlsx,.xls" class="hidden">
-      </div>
-      ${STATE.parseErrors.length > 0 ? STATE.parseErrors.map(e => `<div class="field-error" style="margin-top:8px;">⚠ ${e}</div>`).join('') : ''}
-    </div>
-
-    ${STATE.personas.length > 0 ? renderResumenPaso1() : ''}
-
-    <div class="btn-row" style="margin-top:20px;">
-      <button class="btn" ${puedeValidar() ? '' : 'disabled'} onclick="irAValidacion()">Validar propuesta ▸</button>
-    </div>
-  </section>`;
-}
-
-function renderResumenPaso1() {
-  // Usa getBloquesPropuesta para que en Acuerdo 2024 los bloques se determinen
-  // por número de orden (1-8 / 9-17) y no por universidad (art. 12.1 y art. 13).
-  const { bloqueA: a, bloqueB: b } = getBloquesPropuesta(STATE.personas, STATE.tipoPlaza);
-  const mujeres = STATE.personas.filter(p => p.sexo === 'MUJER').length;
-  const hombres = STATE.personas.filter(p => p.sexo === 'HOMBRE').length;
-  const upvEnA = a.filter(p => isUPV(p.universidad)).length;
-  const biling = a.filter(p => isBilingue(p.perfil)).length;
-  // En Acuerdo 2024 el Bloque A puede mezclar UPV/EHU y externos, por lo que
-  // mostramos las personas UPV/EHU reales dentro del Bloque A como subcontador.
-  const labelA = STATE.tipoPlaza === 'acuerdo2024'
-    ? `Bloque A (nº 1–8) · ${upvEnA} UPV/EHU`
-    : 'Bloque A (UPV/EHU)';
-  return `
-  <div class="summary-grid">
-    <div class="summary-cell"><div class="label">${labelA}</div><div class="value">${a.length}</div></div>
-    <div class="summary-cell"><div class="label">Bloque B (nº 9–17)</div><div class="value">${b.length}</div></div>
-    <div class="summary-cell"><div class="label">Mujeres / Hombres</div><div class="value">${mujeres} / ${hombres}</div></div>
-    <div class="summary-cell"><div class="label">Biling./Triling. (Bloque A)</div><div class="value">${biling} / ${a.length}</div></div>
-  </div>`;
-}
-
-function puedeValidar() {
-  return STATE.tipoPlaza && STATE.codigoPlaza && STATE.personas.length > 0 &&
-    (STATE.tipoPlaza !== 'acuerdo2024' || STATE.subcategoria);
-}
-
-function irAValidacion() {
-  if (!puedeValidar()) { STATE.codigoPlazaAttempted = true; render(); return; }
-  validarPropuesta();
-  STATE.step = 2;
-  render();
-}
-
-/* ==========================================================================
-   PASO 2
-   ========================================================================== */
-
-function renderPaso2() {
-  const bloqueantes = hayBloqueantes();
-  const numErrores = STATE.issues.filter(i => i.tipo === 'error' && !i.cpuResuelto).length;
-  const numResueltas = STATE.issues.filter(i => i.tipo === 'error' && i.cpuResuelto).length;
-  const reglamentoLabel = STATE.tipoPlaza === 'ayudante_doctor'
-    ? REGLAMENTOS.ayudante_doctor.fuente
-    : `${REGLAMENTOS.acuerdo2024.fuente} · ${REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria].label}`;
-
-  let stampHtml;
-  if (numErrores === 0 && numResueltas === 0) {
-    stampHtml = `<span class="stamp ok">Propuesta conforme · sorteo habilitado</span><span class="stamp-note">No se han detectado anomalías.</span>`;
-  } else if (numErrores === 0 && numResueltas > 0) {
-    stampHtml = `<span class="stamp exc">${numResueltas} excepción(es) autorizada(s) por CPU · sorteo habilitado</span><span class="stamp-note">Todas las anomalías detectadas han sido validadas manualmente.</span>`;
-  } else {
-    stampHtml = `<span class="stamp">${numErrores} anomalía(s) detectada(s)</span><span class="stamp-note">El sorteo permanece bloqueado hasta resolverlas o marcarlas como excepción CPU.</span>`;
-  }
-
-  return `
-  <section class="panel">
-    <h2>2 · Resultado de la validación</h2>
-    <p class="sub">Comprobación automática frente a los requisitos de: ${reglamentoLabel}.</p>
-
-    <div class="stamp-row">${stampHtml}</div>
-
-    <div style="margin:18px 0 22px;">
-      ${STATE.checksOk.map(t => `<div class="check-ok"><span class="mark">✓</span> ${t}</div>`).join('')}
-    </div>
-
-    ${STATE.issues.map(issue => renderIssueCard(issue)).join('')}
-
-    <div class="export-row">
-      <span class="stamp-note">Informe de validación: composición, anomalías, artículos y excepciones aplicadas.</span>
-      <div class="btn-row">
-        <button class="btn secondary" onclick="exportarInformeExcel()">↓ Exportar a Excel</button>
-        <button class="btn secondary" onclick="exportarInformePDF()">↓ Descargar informe (PDF)</button>
-      </div>
-    </div>
-
-    <div class="btn-row" style="margin-top:20px;">
-      <button class="btn secondary" onclick="goToStep(1)">‹ Volver a la carga</button>
-      <button class="btn" ${bloqueantes ? 'disabled' : ''} onclick="irASorteo()">Continuar al sorteo ▸</button>
-    </div>
-  </section>`;
-}
-
-function renderIssueCard(issue) {
-  const cls = issue.tipo === 'warn' ? 'issue warn' : (issue.cpuResuelto ? 'issue resolved' : 'issue');
-  const tagText = issue.cpuResuelto ? `Excepción CPU · ${issue.tag}` : (issue.tipo === 'warn' ? issue.tag : `Anomalía · ${issue.tag}`);
-  const cpuBlock = issue.tipo === 'error' ? `
-    <div class="cpu-toggle">
-      <div class="cpu-toggle-row" onclick="toggleCPU('${issue.id}')">
-        <span class="switch ${issue.cpuResuelto ? 'on' : ''}"></span>
-        <span class="cpu-toggle-label">Marcar como excepción validada por la Comisión de Planificación Universitaria (CPU)</span>
-      </div>
-      <div class="cpu-field ${issue.cpuRef ? 'filled' : ''}">
-        <span>Ref.:</span>
-        <input type="text" data-cpu-ref="${issue.id}" value="${issue.cpuRef}" placeholder="Introduce nº de acta / referencia CPU…" ${issue.cpuResuelto ? '' : 'disabled'}>
-      </div>
-    </div>` : '';
-  return `
-  <div class="${cls}">
-    <div class="head"><span class="tag">${tagText}</span><span class="ref">${issue.ref}</span></div>
-    <div class="desc">${issue.desc}</div>
-    ${issue.sugerencia ? `<div class="suggestion"><span class="icon">→</span><span>${issue.sugerencia}</span></div>` : ''}
-    ${cpuBlock}
-  </div>`;
-}
-
-function toggleCPU(id) {
-  const issue = STATE.issues.find(i => i.id === id);
-  issue.cpuResuelto = !issue.cpuResuelto;
-  render();
-}
-
-function irASorteo() {
-  STATE.step = 3;
-  render();
-}
-</script>
-
-<script>
-/* ==========================================================================
-   PASO 3
-   ========================================================================== */
-
-function validarBolas() {
-  const vals = STATE.bolas.map(v => v.trim()).filter(v => v !== '');
-  const errores = [];
-  if (vals.length !== 17) errores.push(`Se han introducido ${vals.length} de 17 posiciones requeridas.`);
-  const nums = vals.map(v => parseInt(v, 10));
-  const invalidos = vals.filter((v, i) => isNaN(nums[i]) || nums[i] < 1 || nums[i] > 17);
-  if (invalidos.length > 0) errores.push(`Valor(es) fuera de rango (1–17): ${invalidos.join(', ')}.`);
-  const vistos = new Set();
-  const repetidos = new Set();
-  nums.forEach(n => { if (!isNaN(n)) { if (vistos.has(n)) repetidos.add(n); vistos.add(n); } });
-  if (repetidos.size > 0) errores.push(`Número(s) repetido(s): ${[...repetidos].join(', ')}.`);
-  return { valido: errores.length === 0 && vals.length === 17, errores, nums };
-}
-
-function renderPaso3() {
-  const check = validarBolas();
-  const bloqueantes = hayBloqueantes();
-
-  return `
-  <section class="panel">
-    <h2>3 · Sorteo y composición final</h2>
-    ${bloqueantes
-      ? `<div class="banner-warn2">⚠ <span>Hay anomalías sin resolver en el <b>Paso 2</b>. Vuelve atrás para resolverlas o marcarlas como excepción CPU.</span></div>`
-      : `<div class="banner-carried">✓ <span>Se utiliza la propuesta validada en el <b>Paso 2</b> — no es necesario volver a cargarla.</span></div>`}
-
-    <div class="balls-section">
-      <h3>Orden de extracción de las bolas</h3>
-      <p class="sub2">Rellena el orden en que han salido los 17 números en el sorteo público, de izquierda a derecha.</p>
-      <div class="balls-row">
-        ${STATE.bolas.map((v, i) => `
-          <div class="ball ${v && (isNaN(parseInt(v,10)) || parseInt(v,10)<1 || parseInt(v,10)>17) ? 'err' : ''}">
-            <span class="pos">${i + 1}ª</span>
-            <input type="text" maxlength="2" data-bola-idx="${i}" value="${v}">
-          </div>`).join('')}
-      </div>
-      <div class="or-divider">o bien, introduce la secuencia como texto</div>
-      <div class="text-input-row">
-        <input id="bolasTexto" type="text" placeholder="Ej: 14-12-5-8-17-3-13-11-7-16-9-1-4-6-10-15-2">
-        <button class="btn secondary" onclick="aplicarBolasTexto()">Aplicar a las bolas</button>
-      </div>
-      <p style="font-size:11.5px; color:var(--ink-soft); margin:6px 0 0;">
-        Se admiten guiones, comas o espacios como separador. Formato preferente: guion.
-      </p>
-
-      ${!check.valido && STATE.bolas.some(v => v !== '') ? `
-      <div class="issue" style="margin-top:16px; margin-bottom:0;">
-        <div class="head"><span class="tag">Error de validación</span></div>
-        <div class="desc" style="margin-bottom:0;">${check.errores.join(' ')} Corrige la secuencia antes de continuar.</div>
-      </div>` : ''}
-
-      <div class="btn-row" style="margin-top:16px;">
-        <button class="btn" ${(check.valido && !bloqueantes) ? '' : 'disabled'} onclick="calcularYMostrar()">Calcular composición ▸</button>
-      </div>
-    </div>
-
-    ${STATE.resultado ? renderResultadoSorteo() : ''}
-
-    <div class="btn-row" style="margin-top:10px;">
-      <button class="btn secondary" onclick="goToStep(2)">‹ Volver a la validación</button>
-    </div>
-  </section>`;
-}
-
-function renderResultadoSorteo() {
-  const r = STATE.resultado;
-  const reglaLabel = STATE.tipoPlaza === 'ayudante_doctor' ? 'art. 4 (Reglamento Ayudante Doctor)' : 'art. 13 (Reglamento 26/09/2024)';
-
-  const trazaHtml = r.traza.map(t => `
-    <div class="trace-item">
-      <div class="t-head"><span class="t-block">Bloque ${t.bloque}</span><span class="t-rule">${t.regla}</span></div>
-      <div class="t-text">${t.texto}</div>
-    </div>`).join('');
-
-  function filaTabla(p, esTitular) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (esTitular ? '-TIT' : '-SUP');
-    const codeClass = esTitular ? 'tit' : 'sup';
-    return `<tr>
-      <td class="code-cell ${codeClass}">${codigo}</td>
-      <td>${p.numero}</td>
-      <td>${maskDNI(p.dni)}</td>
-      <td>${nombreCompleto(p)}</td>
-      <td>${esTitular ? 'Titular' : 'Suplente'}</td>
-      <td>${p.universidad}</td>
-      <td>${p.categoria}</td>
-      <td>${p.situacion}</td>
-      <td>${p.areaCodigo}</td>
-      <td>${p.areaNombre}</td>
-      <td>${p.perfil || '—'}</td>
-      <td>${p.sexo}</td>
-    </tr>`;
-  }
-
-  const bloqueA = STATE.personas.filter(p => isUPV(p.universidad));
-  const mujeresTit = r.titulares.filter(p => p.sexo === 'MUJER').length;
-  const externosTit = r.titulares.filter(p => !isUPV(p.universidad)).length;
-  const algunBilingueComision = [...r.titulares, ...r.suplentes].some(p => isBilingue(p.perfil));
-
-  return `
-    <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:26px 0 4px;">Traza del procedimiento</h3>
-    <p class="sub2" style="margin-bottom:0;">Lógica aplicada paso a paso conforme al ${reglaLabel}.</p>
-    <div class="trace">${trazaHtml}</div>
-
-    <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:22px 0 10px;">Composición resultante</h3>
-    <div class="table-scroll">
-    <table class="result">
-      <thead><tr>
-        <th>Código</th><th>Nº</th><th>DNI/NAN</th><th>Nombre y apellidos</th><th>Función tribunal</th>
-        <th>Universidad</th><th>Cuerpo-Categoría</th><th>Situación</th>
-        <th>Área (código)</th><th>Área (literal)</th><th>Perfil ling.</th><th>Sexo</th>
-      </tr></thead>
-      <tbody>
-        ${r.titulares.map(p => filaTabla(p, true)).join('')}
-        <tr class="separator"><td colspan="12"></td></tr>
-        ${r.suplentes.map(p => filaTabla(p, false)).join('')}
-      </tbody>
-    </table>
-    </div>
-    <p style="font-size:11.5px; color:var(--ink-soft); margin-top:8px;">
-      DNI mostrado enmascarado en pantalla por protección de datos; el archivo Excel exportado incluye el valor completo para su incorporación al expediente.
-    </p>
-
-    <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:22px 0 10px;">Verificación final</h3>
-    <div class="check-ok"><span class="mark">✓</span> ${r.titulares.length} titulares + ${r.suplentes.length} suplentes.</div>
-    <div class="check-ok"><span class="mark">${mujeresTit >= 2 ? '✓' : '⚠'}</span> ${mujeresTit} mujer(es) entre los titulares.</div>
-    <div class="check-ok"><span class="mark">✓</span> ${externosTit} de ${r.titulares.length} titulares son personas externas a la UPV/EHU.</div>
-    ${STATE.perfilLinguistico === 'bilingue' ? `<div class="check-ok"><span class="mark">${algunBilingueComision ? '✓' : '⚠'}</span> ${algunBilingueComision ? 'Al menos una persona con capacidad bilingüe/trilingüe entre titulares y suplentes.' : 'No se ha detectado ninguna persona bilingüe/trilingüe entre titulares y suplentes: revisa manualmente.'}</div>` : ''}
-
-    <div class="export-row">
-      <span class="stamp-note">Acta de composición de la Comisión, con la traza completa del procedimiento, lista para incorporar al expediente.</span>
-      <div class="btn-row">
-        <button class="btn secondary" onclick="exportarActaExcel()">↓ Exportar a Excel</button>
-        <button class="btn secondary" onclick="exportarActaPDF()">↓ Exportar a PDF (acta)</button>
-      </div>
-    </div>`;
-}
-
-function calcularYMostrar() {
-  const check = validarBolas();
-  if (!check.valido || hayBloqueantes()) { render(); return; }
-  STATE.resultado = calcularComposicion(STATE.personas, check.nums, STATE.tipoPlaza, STATE.subcategoria, STATE.perfilLinguistico === 'bilingue');
-  render();
-}
-</script>
-
-<script>
-/* ==========================================================================
-   EVENTOS
-   ========================================================================== */
-
-function setTipoPlaza(tipo) {
-  STATE.tipoPlaza = tipo;
-  STATE.subcategoria = tipo === 'acuerdo2024' ? null : null;
-  render();
-}
-function setSubcategoria(sub) { STATE.subcategoria = sub; render(); }
-function setPerfil(p) { STATE.perfilLinguistico = p; render(); }
-function toggleFeminizada() { STATE.areaFuertementeFeminizada = !STATE.areaFuertementeFeminizada; render(); }
-
-function aplicarBolasTexto() {
-  const txt = document.getElementById('bolasTexto').value;
-  const partes = txt.split(/[-,\s]+/).map(s => s.trim()).filter(Boolean);
-  const nuevo = Array(17).fill('');
-  partes.slice(0, 17).forEach((v, i) => { nuevo[i] = v; });
-  STATE.bolas = nuevo;
-  render();
-}
-
-function handleFile(file) {
-  STATE.fileName = file.name;
-  STATE.parseErrors = [];
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const { titulo, codigoDetectado, personas, errors } = parseWorkbookFile(data);
-      STATE.tituloExcel = titulo;
-      STATE.codigoPlazaExcel = codigoDetectado;
-      STATE.personas = personas;
-      STATE.parseErrors = errors;
-      if (!STATE.codigoPlaza && codigoDetectado) STATE.codigoPlaza = codigoDetectado; // autocompletar si estaba vacío
-    } catch (err) {
-      STATE.parseErrors = ['No se ha podido leer el archivo. Comprueba que es un .xlsx válido y que sigue la plantilla estándar.'];
-      STATE.personas = [];
-    }
-    render();
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function wireEvents() {
-  const codigoInput = document.getElementById('codigoPlazaInput');
-  if (codigoInput) {
-    codigoInput.addEventListener('input', (e) => {
-      const pos = e.target.selectionStart;
-      STATE.codigoPlaza = e.target.value.toUpperCase();
-      e.target.value = STATE.codigoPlaza;
-      e.target.setSelectionRange(pos, pos);
-    });
-    codigoInput.addEventListener('blur', () => render());
-  }
-
-  const dropzone = document.getElementById('dropzone');
-  const fileInput = document.getElementById('fileInput');
-  if (dropzone && fileInput) {
-    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-    dropzone.addEventListener('drop', (e) => {
-      e.preventDefault(); dropzone.classList.remove('drag');
-      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-    });
-  }
-
-  document.querySelectorAll('[data-cpu-ref]').forEach(inp => {
-    inp.addEventListener('input', (e) => {
-      const issue = STATE.issues.find(i => i.id === e.target.dataset.cpuRef);
-      issue.cpuRef = e.target.value;
-    });
-    inp.addEventListener('blur', () => render());
-  });
-
-  document.querySelectorAll('[data-bola-idx]').forEach(inp => {
-    inp.addEventListener('input', (e) => {
-      const idx = parseInt(e.target.dataset.bolaIdx, 10);
-      STATE.bolas[idx] = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
-      e.target.value = STATE.bolas[idx];
-    });
-    inp.addEventListener('blur', () => render());
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const idx = parseInt(e.target.dataset.bolaIdx, 10);
-        const next = document.querySelector(`[data-bola-idx="${idx + 1}"]`);
-        if (next) next.focus();
-      }
-    });
-  });
-}
-
-/* ==========================================================================
-   EXPORTACIÓN — EXCEL (informe de validación y acta de composición)
-   ========================================================================== */
-
-function exportarInformeExcel() {
-  const wb = XLSX.utils.book_new();
-  const rows = [];
-  rows.push([`INFORME DE VALIDACIÓN — PLAZA ${STATE.codigoPlaza}`]);
-  rows.push([`Reglamento: ${STATE.tipoPlaza === 'ayudante_doctor' ? REGLAMENTOS.ayudante_doctor.fuente : REGLAMENTOS.acuerdo2024.fuente + ' — ' + REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria].label}`]);
-  rows.push([`Perfil lingüístico: ${STATE.perfilLinguistico === 'bilingue' ? 'Bilingüe / Trilingüe' : 'No bilingüe'}`]);
-  rows.push([]);
-  rows.push(['COMPROBACIONES CONFORMES']);
-  STATE.checksOk.forEach(t => rows.push(['✓', t.replace(/<[^>]+>/g, '')]));
-  rows.push([]);
-  rows.push(['ANOMALÍAS Y AVISOS']);
-  rows.push(['Estado', 'Tipo', 'Referencia normativa', 'Descripción', 'Sugerencia', 'Excepción CPU', 'Referencia CPU']);
-  STATE.issues.forEach(i => rows.push([
-    i.tipo === 'warn' ? 'AVISO' : (i.cpuResuelto ? 'EXCEPCIÓN CPU' : 'ANOMALÍA'),
-    i.tag, i.ref, i.desc.replace(/<[^>]+>/g, ''), (i.sugerencia || '').replace(/<[^>]+>/g, ''),
-    i.cpuResuelto ? 'SÍ' : 'NO', i.cpuRef || '',
-  ]));
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 60 }, { wch: 60 }, { wch: 14 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'Informe validación');
-  XLSX.writeFile(wb, `Informe_validacion_${STATE.codigoPlaza || 'plaza'}.xlsx`);
-}
-
-function exportarActaExcel() {
-  const r = STATE.resultado;
-  if (!r) return;
-  const wb = XLSX.utils.book_new();
-  const headers = ['CODIGO', 'Número', 'DNI/NAN', 'NOMBRE Y APELLIDOS', 'FUNCION TRIBUNAL', 'UNIVERSIDAD',
-    'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA', 'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)',
-    'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)', 'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
-  const rows = [];
-  rows.push([`COMPOSICIÓN COMISIÓN DE SELECCIÓN — PLAZA ${STATE.codigoPlaza}`]);
-  rows.push(headers);
-  function fila(p, tit) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
-    return [codigo, p.numero, p.dni, nombreCompleto(p), tit ? 'Titular' : 'Suplente', p.universidad,
-      p.categoria, p.situacion, p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo];
-  }
-  r.titulares.forEach(p => rows.push(fila(p, true)));
-  rows.push(Array(12).fill(''));
-  r.suplentes.forEach(p => rows.push(fila(p, false)));
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = headers.map(() => ({ wch: 18 }));
-  XLSX.utils.book_append_sheet(wb, ws, 'Composición');
-  XLSX.writeFile(wb, `Composicion_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
-}
-
-/* ==========================================================================
-   EXPORTACIÓN — PDF (vía vista de impresión del navegador)
-   ========================================================================== */
-
-function abrirVentanaImpresion(titulo, cuerpoHtml) {
-  const w = window.open('', '_blank');
-  w.document.write(`
-    <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title>
-    <style>
-      body{font-family:Georgia,serif; color:#1C2333; padding:32px; max-width:900px; margin:0 auto;}
-      h1{font-size:20px; border-bottom:2px solid #1C2333; padding-bottom:10px;}
-      h2{font-size:15px; margin-top:26px;}
-      table{width:100%; border-collapse:collapse; font-size:11px; margin-top:10px;}
-      th,td{border:1px solid #999; padding:5px 7px; text-align:left;}
-      th{background:#EDEBE4;}
-      .ok{color:#2F6B4F;} .err{color:#A33B33;} .exc{color:#5B4B8A;}
-      .sep td{background:#EDEBE4; height:6px; padding:0; border:none;}
-      @media print{ .no-print{display:none;} }
-    </style></head><body>
-    ${cuerpoHtml}
-    <p class="no-print"><button onclick="window.print()">Imprimir / Guardar como PDF</button></p>
-    </body></html>`);
-  w.document.close();
-}
-
-function exportarInformePDF() {
-  let body = `<h1>Informe de validación — Plaza ${STATE.codigoPlaza}</h1>`;
-  body += `<p><b>Reglamento:</b> ${STATE.tipoPlaza === 'ayudante_doctor' ? REGLAMENTOS.ayudante_doctor.fuente : REGLAMENTOS.acuerdo2024.fuente + ' — ' + REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria].label}</p>`;
-  body += `<h2>Comprobaciones conformes</h2><ul>${STATE.checksOk.map(t => `<li class="ok">✓ ${t}</li>`).join('')}</ul>`;
-  body += `<h2>Anomalías y avisos</h2>`;
-  if (STATE.issues.length === 0) body += `<p>No se han detectado anomalías.</p>`;
-  STATE.issues.forEach(i => {
-    const cls = i.tipo === 'warn' ? 'exc' : (i.cpuResuelto ? 'exc' : 'err');
-    body += `<p class="${cls}"><b>${i.cpuResuelto ? 'Excepción CPU' : (i.tipo === 'warn' ? 'Aviso' : 'Anomalía')} · ${i.tag}</b> (${i.ref})<br>${i.desc}${i.sugerencia ? `<br><i>Sugerencia: ${i.sugerencia}</i>` : ''}${i.cpuResuelto ? `<br><i>Referencia CPU: ${i.cpuRef}</i>` : ''}</p>`;
-  });
-  abrirVentanaImpresion(`Informe validación ${STATE.codigoPlaza}`, body);
-}
-
-function exportarActaPDF() {
-  const r = STATE.resultado;
-  if (!r) return;
-  function fila(p, tit) {
-    const codigo = (isUPV(p.universidad) ? 'UPV/EHU' : 'EXT') + (tit ? '-TIT' : '-SUP');
-    return `<tr><td>${codigo}</td><td>${p.numero}</td><td>${p.dni}</td><td>${nombreCompleto(p)}</td>
-      <td>${tit ? 'Titular' : 'Suplente'}</td><td>${p.universidad}</td><td>${p.categoria}</td>
-      <td>${p.situacion}</td><td>${p.areaCodigo}</td><td>${p.areaNombre}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
-  }
-  let body = `<h1>Composición Comisión de Selección — Plaza ${STATE.codigoPlaza}</h1>`;
-  body += `<table><thead><tr><th>Código</th><th>Nº</th><th>DNI/NAN</th><th>Nombre y apellidos</th><th>Función</th>
-    <th>Universidad</th><th>Cuerpo-Categoría</th><th>Situación</th><th>Área (cód.)</th><th>Área (literal)</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
-  body += r.titulares.map(p => fila(p, true)).join('');
-  body += `<tr class="sep"><td colspan="12"></td></tr>`;
-  body += r.suplentes.map(p => fila(p, false)).join('');
-  body += `</tbody></table>`;
-  body += `<h2>Traza del procedimiento</h2><ol>${r.traza.map(t => `<li><b>Bloque ${t.bloque}</b> (${t.regla}) — ${t.texto}</li>`).join('')}</ol>`;
-  abrirVentanaImpresion(`Acta composición ${STATE.codigoPlaza}`, body);
-}
-
-/* ==========================================================================
-   ARRANQUE
-   ========================================================================== */
-
-render();
-</script>
-</body>
-</html>
+# CASO-003 - Comisión de Selección para Profesorado Pleno (bilingüe)
+
+## Estado
+
+**Validado**
+
+Este caso corresponde a una propuesta real de Departamento para una plaza de Profesorado
+Pleno, perfil bilingüe. El resultado de la composición ha sido verificado ejecutando el
+motor de sorteo (`calcularComposicion`) tal y como está implementado en `validador.html`,
+y coincide exactamente, persona a persona y en el mismo orden, con la comisión oficial
+resultante.
+
+Debe utilizarse como caso de referencia congelado (regresión) para el régimen de
+Acuerdo 26/09/2024, subcategoría Pleno, perfil bilingüe — análogo a CASO-002 para
+Catedrático bilingüe.
+
+---
+
+# Objetivo
+
+Describir el procedimiento completo seguido para construir una Comisión de Selección de
+una plaza de Profesorado Pleno bilingüe a partir de:
+
+- la propuesta inicial de miembros (17 personas, Bloque A 1–8 / Bloque B 9–17);
+- el resultado del sorteo;
+- la aplicación de las reglas de negocio (art. 12 y art. 13 del Acuerdo 26/09/2024).
+
+---
+
+# Contexto
+
+## Tipo de plaza
+
+Catedrático · Pleno · Titular · Agregado (Acuerdo 26/09/2024) — subcategoría **Pleno**
+
+## Código de plaza
+
+PLC8L1-D00039-1
+
+## Área de conocimiento
+
+755 - Química Física (Bloque A y mayoría del Bloque B; ver nota sobre áreas afines más
+abajo)
+
+## Perfil lingüístico
+
+Bilingüe
+
+---
+
+# Datos de entrada
+
+## Propuesta inicial
+
+La propuesta inicial está formada por **17 personas**: 8 en el Bloque A (nº 1–8, todas de
+la UPV/EHU) y 9 en el Bloque B (nº 9–17, todas externas). Fichero de referencia:
+`propuesta_pleno_bilingue.csv`.
+
+Nota sobre la columna "Cuerpo-Categoría": en esta propuesta real llega como texto
+compuesto con género flexionado — "Profesor Catedratico", "Profesora Catedratica",
+"Profesor Pleno" — y no como la palabra clave aislada ("Catedrático", "Pleno"). Este
+caso fue precisamente el que puso de manifiesto que el check de categoría de
+`validarPropuesta()` debía compararse por raíz léxica normalizada (`CATEDRATIC`, `PLEN`)
+y no por igualdad exacta ni por la palabra completa "CATEDRATICO" (que no reconoce por
+subcadena la forma femenina "CATEDRATICA").
+
+Nota sobre área de conocimiento: la propuesta incluye 4 códigos de área distintos (755,
+760, 750, 555), todos dentro del ámbito de Química. Esto genera un aviso ("Requiere
+criterio") por uso de áreas afines, no un bloqueante.
+
+## Resultado del sorteo
+
+Orden obtenido (bolas 1–17, sorteo único reordenado por bloques según la práctica habitual
+descrita en `resumen_composicion_catedratico_no_bilingue.md`):
+
+9 → 11 → 16 → 10 → 14 → 17 → 6 → 5 → 12 → 8 → 4 → 7 → 15 → 3 → 1 → 13 → 2
+
+---
+
+# Procedimiento aplicado
+
+1. Partir de la propuesta inicial (Bloque A: nº 1–8, todos UPV/EHU; Bloque B: nº 9–17,
+   todos externos).
+2. Aplicar el orden obtenido en el sorteo para reordenar la lista completa.
+3. Bloque A — régimen general art. 13.2.1 (Pleno bilingüe usa el mismo régimen que
+   Catedrático, no el art. 13.2.2 específico de Pleno/Agregado no bilingüe):
+   - Pareja titular: primera persona UPV/EHU bilingüe de la lista reordenada, y a
+     continuación primera persona de género distinto.
+   - Se repite el proceso dos veces más para obtener las 4 personas suplentes.
+4. Bloque B — art. 13.3.a: primera persona externa de la lista reordenada y, alternando
+   género, cinco personas externas más.
+5. Verificar el cumplimiento de todas las reglas de negocio.
+6. Obtener la composición definitiva de la Comisión.
+
+---
+
+# Resultado esperado
+
+## Miembros titulares
+
+### Bloque A (UPV/EHU)
+
+| Nº | Nombre | Categoría | Sexo |
+|----|---------|-----------|------|
+| 6 | Olatz Zuloaga Zubieta | Profesora Catedrática | Mujer |
+| 4 | Jose Javier López Pestaña | Profesor Catedrático | Hombre |
+
+### Bloque B (externos)
+
+| Nº | Nombre | Universidad | Categoría |
+|----|---------|-------------|-----------|
+| 9 | Ignacio Nilo Tuñón García de Vicuña | Universitat de València | Profesor Catedrático |
+| 16 | Ana María Graña Rodríguez | Universidad de Vigo | Profesora Catedrática |
+| 11 | José Albadalejo Pérez | Universidad de Castilla-La Mancha | Profesor Catedrático |
+
+---
+
+## Miembros suplentes
+
+### Bloque A (UPV/EHU)
+
+| Nº | Nombre | Categoría | Sexo |
+|----|---------|-----------|------|
+| 5 | María Teresa Insausti Peña | Profesora Catedrática | Mujer |
+| 3 | Jon Mattin Matxain Beraza | Profesor Pleno | Hombre |
+| 8 | María Coro De la Caba Ciriza | Profesora Catedrática | Mujer |
+| 1 | Jose Luis Vilas Vilela | Profesor Catedrático | Hombre |
+
+### Bloque B (externos)
+
+| Nº | Nombre | Universidad | Categoría |
+|----|---------|-------------|-----------|
+| 14 | Clara Gómez Clari | Universitat de València | Profesora Catedrática |
+| 10 | Franciso Monroy Muñoz | Universidad Complutense de Madrid | Profesor Catedrático |
+| 17 | Elena Jiménez Martínez | Universidad de Castilla-La Mancha | Profesora Catedrática |
+
+---
+
+# Reglas aplicadas
+
+Durante este caso intervienen, al menos, las siguientes reglas:
+
+- REG-001 - Número de miembros (17 personas, 8+9).
+- REG-002 - Procedencia institucional (Bloque A por posición 1–8, no por afiliación).
+- REG-003 - Categorías académicas (Catedrático/a o Pleno, matching por raíz léxica).
+- REG-004 - Área de conocimiento (aviso por áreas afines, no bloqueante).
+- REG-005 - Equilibrio de género (mínimo 4 mujeres en cada bloque).
+- REG-006 - Requisitos lingüísticos (100% del Bloque A con capacidad bilingüe, art. 12.2).
+- REG-007 - Situación administrativa (todos "Activo").
+
+---
+
+# Validaciones esperadas
+
+La aplicación deberá verificar que:
+
+- La numeración es 1–17 sin huecos ni duplicados.
+- El Bloque A (nº 1–8) y el Bloque B (nº 9–17) se determinan por posición, no por
+  afiliación institucional.
+- Las 8 personas del Bloque A tienen capacidad bilingüe/trilingüe (art. 12.2, 100%
+  exigido para Pleno/Agregado bilingüe).
+- Todas las personas cumplen la categoría exigida (Catedrático/a o Pleno) pese a llegar
+  con variantes de género en el texto de la categoría.
+- Se respeta el mínimo de 4 mujeres en cada bloque.
+- La Comisión generada por el motor de sorteo coincide exactamente con la composición
+  oficial descrita en este documento.
+
+---
+
+# Documentación asociada
+
+- `propuesta_pleno_bilingue.csv` — propuesta oficial de miembros.
+- `comision_pleno_bilingue.csv` — comisión definitiva de referencia.
+- Orden de sorteo: ver sección "Resultado del sorteo" arriba.
+
+---
+
+# Fuente normativa
+
+- ACUERDO de 26 de septiembre de 2024 (BOPV 10/10/2024), arts. 11, 12 y 13.
+- `resumen_composicion_pleno_bilingue.md`, `resumen_propuessta_pleno_bilingue.md`.
