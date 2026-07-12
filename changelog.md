@@ -6,6 +6,66 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.1] — 2026-07-12
+
+Versión de correcciones y ampliaciones sobre los informes y exportaciones del Paso 2 y el
+Paso 3, sin cambios en la lógica de validación ni en el motor de sorteo.
+
+### Fixed
+
+- `extraerCodigoDeTitulo()` no reconocía títulos de Excel con espacios alrededor de los
+  guiones del código de plaza (p. ej. "PLAZA PADCL2 - D00337 - 19"), dejando el campo
+  Código de la plaza vacío pese a haberse cargado la propuesta correctamente, y con ello
+  el botón "Validar propuesta" deshabilitado sin ningún aviso claro del motivo. Corregido
+  ampliando la expresión regular para admitir espacios y normalizando el resultado
+  eliminándolos (`PADCL2-D00337-19`).
+
+### Added
+
+- Informe de validación descargable en PDF (Paso 2): añadido un enlace a la normativa
+  oficial aplicable justo debajo del reglamento (`2402876a` para Ayudante Doctor,
+  `reglamento-pdf` para el Acuerdo 26/09/2024), y una tabla con los datos completos de la
+  propuesta (en su numeración original), con las filas resaltadas — rojo para anomalía sin
+  resolver, morado para excepción CPU ya aceptada, ámbar para aviso (p. ej. equivalencia de
+  categoría). Ambos elementos aparecen únicamente en el PDF descargable, no en la vista en
+  pantalla del Paso 2.
+- Acta de composición en Excel (Paso 3, `exportarActaExcel()`): dos pestañas nuevas junto a
+  "Composición" —
+  - **"Introducción de datos"**: la propuesta tal como la mandó el Departamento, en su
+    numeración original (antes del sorteo), con título fusionado A1:G1 ("PROPUESTA
+    COMISION [código]") y el mismo estilo de cabecera que "Composición". Columna B
+    intencionadamente en blanco (sin DNI), ocupando la posición de esa columna en la
+    plantilla original.
+  - **"Sorteo"**: la propuesta reordenada tras el sorteo, agrupada por bloque (Bloque A
+    primero, Bloque B después, igual que en el PDF), con las columnas "Sorteo" (valor de
+    la secuencia de bolas en la posición que le corresponde dentro de esta tabla agrupada)
+    y "Ordenación bloques" (número de orden original de la persona en la propuesta, art.
+    12.1). Fila 10 (primera del Bloque B) con borde superior más grueso para diferenciar
+    visualmente los bloques. DNI mostrado enmascarado, igual que en el resto de la app.
+  - Orden final de las pestañas del libro: Introducción de datos → Composición → Sorteo.
+  - `calcularComposicion()` expone ahora también `ordenBolas` en su resultado, para poder
+    construir la columna "Sorteo" de la nueva pestaña.
+  - Estilos de celda (relleno de cabecera, bordes, fuente) y el cálculo de ancho automático
+    de columna, antes definidos dentro de `exportarActaExcel()`, extraídos a constantes de
+    módulo (`EXCEL_ESTILO_*`) y a la función `excelAnchoAuto()`, reutilizadas por las tres
+    pestañas en vez de duplicar el código.
+- Acta de composición en PDF (Paso 3, `exportarActaPDF()`): añadida al final, después de la
+  tabla de la propuesta reordenada del Bloque B, la sección "Anomalías y avisos" (excepciones
+  CPU aceptadas, avisos y sus referencias), idéntica a la ya mostrada en el informe del Paso
+  2. Extraída a la función compartida `renderBloqueAnomaliasPDF()`, usada por ambos informes
+  para que no puedan divergir entre sí.
+
+### Verified
+
+- Columna "Sorteo" de la pestaña homónima contrastada fila a fila contra un caso real
+  (`PADCL2-D00040-4`, propuesta y "algoritmo definitivo" aportados por Fernando):
+  coincidencia exacta en orden de filas, columna Sorteo, columna Ordenación bloques y resto
+  de campos.
+- Sección "Anomalías y avisos" del acta PDF contrastada contra el texto exacto de ese mismo
+  caso real (4 excepciones CPU de categoría no válida en Bloque B): coincidencia exacta.
+
+---
+
 ## [1.2.0] — 2026-07-10
 
 Incorpora la subcategoría **Agregado** (Acuerdo 26/09/2024, BOPV 10/10/2024), reutilizando

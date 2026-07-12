@@ -907,7 +907,7 @@ function renderPaso1() {
         <div class="subcat-opt ${STATE.subcategoria === key ? 'selected' : ''} ${!sub.enabled ? 'disabled' : ''}"
              ${sub.enabled ? `onclick="setSubcategoria('${key}')"` : ''}>
           <span class="radio-dot"></span><span>${sub.label}</span>
-          ${!sub.enabled ? '<span class="tag-soon">v1.2</span>' : ''}
+          ${!sub.enabled ? '<span class="tag-soon">v1.2.1</span>' : ''}
         </div>
       `).join('')}
     </div>` : ''}
@@ -1605,17 +1605,24 @@ function abrirVentanaImpresion(titulo, cuerpoHtml) {
     </body></html>`);
   w.document.close();
 }
+// Bloque "Anomalías y avisos" tal como se muestra en el informe de validación del Paso 2,
+// reutilizado también en el acta de composición del Paso 3 (para dejar constancia de las
+// excepciones CPU aceptadas y avisos junto a la composición final).
+function renderBloqueAnomaliasPDF() {
+  let html = `<h2>Anomalías y avisos</h2>`;
+  if (STATE.issues.length === 0) { html += `<p>No se han detectado anomalías.</p>`; return html; }
+  STATE.issues.forEach(i => {
+    const cls = i.tipo === 'warn' ? 'exc' : (i.cpuResuelto ? 'exc' : 'err');
+    html += `<p class="${cls}"><b>${i.cpuResuelto ? 'Excepción CPU' : (i.tipo === 'warn' ? 'Aviso' : 'Anomalía')} · ${i.tag}</b> (${i.ref})<br>${i.desc}${i.sugerencia ? `<br><i>Sugerencia: ${i.sugerencia}</i>` : ''}${i.cpuResuelto ? `<br><i>Referencia CPU: ${i.cpuRef}</i>` : ''}</p>`;
+  });
+  return html;
+}
 function exportarInformePDF() {
   let body = `<h1>Informe de validación — Plaza ${STATE.codigoPlaza}</h1>`;
   body += `<p><b>Reglamento:</b> ${STATE.tipoPlaza === 'ayudante_doctor' ? REGLAMENTOS.ayudante_doctor.fuente : REGLAMENTOS.acuerdo2024.fuente + ' — ' + REGLAMENTOS.acuerdo2024.subcategorias[STATE.subcategoria].label}</p>`;
   body += `<p><b>Normativa aplicable:</b> <a href="${REGLAMENTOS[STATE.tipoPlaza].normativaUrl}">${REGLAMENTOS[STATE.tipoPlaza].normativaLabel}</a></p>`;
   body += `<h2>Comprobaciones conformes</h2><ul>${STATE.checksOk.map(t => `<li class="ok">✓ ${t}</li>`).join('')}</ul>`;
-  body += `<h2>Anomalías y avisos</h2>`;
-  if (STATE.issues.length === 0) body += `<p>No se han detectado anomalías.</p>`;
-  STATE.issues.forEach(i => {
-    const cls = i.tipo === 'warn' ? 'exc' : (i.cpuResuelto ? 'exc' : 'err');
-    body += `<p class="${cls}"><b>${i.cpuResuelto ? 'Excepción CPU' : (i.tipo === 'warn' ? 'Aviso' : 'Anomalía')} · ${i.tag}</b> (${i.ref})<br>${i.desc}${i.sugerencia ? `<br><i>Sugerencia: ${i.sugerencia}</i>` : ''}${i.cpuResuelto ? `<br><i>Referencia CPU: ${i.cpuRef}</i>` : ''}</p>`;
-  });
+  body += renderBloqueAnomaliasPDF();
   body += renderTablaPropuestaPDF();
   abrirVentanaImpresion(`Informe validación ${STATE.codigoPlaza}`, body);
 }
@@ -1653,6 +1660,7 @@ function exportarActaPDF() {
   body += `<table><thead><tr><th>Nº</th><th>Nombre y apellidos</th><th>Universidad</th><th>Cuerpo-Categoría</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
   body += r.listaReordenadaB.map(filaPropuesta).join('');
   body += `</tbody></table>`;
+  body += renderBloqueAnomaliasPDF();
   abrirVentanaImpresion(`Acta composición ${STATE.codigoPlaza}`, body);
 }
 /* ==========================================================================
