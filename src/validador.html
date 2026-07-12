@@ -625,6 +625,7 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
     listaReordenada,
     listaReordenadaA,
     listaReordenadaB,
+    ordenBolas,
     titulares: [...a.titulares, ...b.titulares],
     suplentes: [...a.suplentes, ...b.suplentes],
     traza,
@@ -1394,10 +1395,44 @@ function exportarInformeExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Informe validación');
   XLSX.writeFile(wb, `Informe_validacion_${STATE.codigoPlaza || 'plaza'}.xlsx`);
 }
+// Estilos de celda comunes a todas las pestañas del Excel exportado en el Paso 3,
+// extraídos de muestra_comision.xlsx (ver CHANGELOG v1.2).
+const EXCEL_BORDE_FINO = { style: 'thin', color: { rgb: '000000' } };
+const EXCEL_BORDE_GRUESO = { style: 'medium', color: { rgb: '000000' } };
+const EXCEL_ESTILO_BORDE = { top: EXCEL_BORDE_FINO, bottom: EXCEL_BORDE_FINO, left: EXCEL_BORDE_FINO, right: EXCEL_BORDE_FINO };
+const EXCEL_ESTILO_CABECERA = {
+  font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: '000000' } },
+  fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } }, // dorado claro, igual que la muestra
+  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  border: EXCEL_ESTILO_BORDE,
+};
+const EXCEL_ESTILO_DATO = {
+  font: { name: 'Calibri', sz: 11, color: { rgb: '000000' } },
+  border: EXCEL_ESTILO_BORDE,
+};
+const EXCEL_ESTILO_SEPARADOR = {
+  fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } }, // amarillo, fila divisoria titulares/suplentes
+  border: EXCEL_ESTILO_BORDE,
+};
+// Ancho automático: ancho del contenido más largo de esa columna (sin contar título ni
+// cabecera), acotado entre un mínimo y un máximo. filas: array de arrays (aoa); startRow:
+// primera fila de datos a considerar (para saltar título y cabecera).
+function excelAnchoAuto(filas, colIdx, minimo, maximo, startRow) {
+  let max = minimo;
+  for (let i = startRow; i < filas.length; i++) {
+    const val = filas[i][colIdx];
+    if (val !== undefined && val !== null && val !== '') {
+      const len = String(val).length;
+      if (len > max) max = len;
+    }
+  }
+  return Math.min(max + 2, maximo);
+}
 function exportarActaExcel() {
   const r = STATE.resultado;
   if (!r) return;
   const wb = XLSX.utils.book_new();
+  construirHojaIntroduccionDatos(wb);
   const headers = ['CODIGO', 'Número', 'NOMBRE Y APELLIDOS', 'FUNCION TRIBUNAL', 'UNIVERSIDAD',
     'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA', 'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)',
     'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)', 'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
@@ -1418,52 +1453,22 @@ function exportarActaExcel() {
   // Título fusionado A1:G1, en negrita
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
   if (ws['A1']) ws['A1'].s = { font: { name: 'Calibri', sz: 11, bold: true } };
-  // Ancho fijo para las columnas ya calibradas con la muestra; ancho automático (según el
-  // contenido más largo, sin contar título ni cabecera) para categoría y área de conocimiento,
-  // que son las que más varían de una plaza a otra.
-  function anchoAuto(colIdx, minimo, maximo) {
-    let max = minimo;
-    for (let i = 2; i < rows.length; i++) {
-      const val = rows[i][colIdx];
-      if (val !== undefined && val !== null && val !== '') {
-        const len = String(val).length;
-        if (len > max) max = len;
-      }
-    }
-    return Math.min(max + 2, maximo);
-  }
   ws['!cols'] = [
     { wch: 17.5 }, { wch: 8.5 }, { wch: 50.5 }, { wch: 16.2 }, { wch: 56.5 },
-    { wch: anchoAuto(5, 10, 45) },  // F — CUERPO-CATEGORIA
+    { wch: excelAnchoAuto(rows, 5, 10, 45, 2) },  // F — CUERPO-CATEGORIA
     { wch: 8.5 },
-    { wch: anchoAuto(7, 8, 20) },   // H — Área de conocimiento (código)
-    { wch: anchoAuto(8, 15, 55) },  // I — Área de conocimiento (literal, la que suele ser larga)
+    { wch: excelAnchoAuto(rows, 7, 8, 20, 2) },   // H — Área de conocimiento (código)
+    { wch: excelAnchoAuto(rows, 8, 15, 55, 2) },  // I — Área de conocimiento (literal, la que suele ser larga)
     { wch: 14.5 }, { wch: 8.5 },
   ];
   // Fila de cabecera alta, igual que en la muestra, para que quepa el texto ajustado
   ws['!rows'] = [{ hpt: 18 }, { hpt: 101.5 }];
-  const bordeFino = { style: 'thin', color: { rgb: '000000' } };
-  const estiloBorde = { top: bordeFino, bottom: bordeFino, left: bordeFino, right: bordeFino };
-  const estiloCabecera = {
-    font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: '000000' } },
-    fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } }, // dorado claro, igual que la muestra
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-    border: estiloBorde,
-  };
-  const estiloDato = {
-    font: { name: 'Calibri', sz: 11, color: { rgb: '000000' } },
-    border: estiloBorde,
-  };
-  const estiloSeparador = {
-    fill: { patternType: 'solid', fgColor: { rgb: 'FFFF00' } }, // amarillo, fila divisoria titulares/suplentes
-    border: estiloBorde,
-  };
   headers.forEach((_, col) => {
     const addr = XLSX.utils.encode_cell({ r: 1, c: col });
-    if (ws[addr]) ws[addr].s = estiloCabecera;
+    if (ws[addr]) ws[addr].s = EXCEL_ESTILO_CABECERA;
   });
   for (let rIdx = 2; rIdx < rows.length; rIdx++) {
-    const estiloFila = rIdx === filaSeparador ? estiloSeparador : estiloDato;
+    const estiloFila = rIdx === filaSeparador ? EXCEL_ESTILO_SEPARADOR : EXCEL_ESTILO_DATO;
     for (let cIdx = 0; cIdx < 11; cIdx++) {
       const addr = XLSX.utils.encode_cell({ r: rIdx, c: cIdx });
       if (!ws[addr]) ws[addr] = { t: 's', v: '' };
@@ -1471,7 +1476,103 @@ function exportarActaExcel() {
     }
   }
   XLSX.utils.book_append_sheet(wb, ws, 'Composición');
+  construirHojaSorteo(wb, r);
   XLSX.writeFile(wb, `Composicion_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
+}
+// Pestaña "Introducción de datos": la propuesta tal como la mandó el Departamento,
+// en su numeración original (antes del sorteo). Columna B intencionadamente en blanco
+// (sin cabecera ni datos): ocupa la posición del DNI/NAN en la plantilla original, pero
+// no se incluye ningún dato personal, igual que en el resto de exportaciones.
+function construirHojaIntroduccionDatos(wb) {
+  const headers = ['Nº /Zk.', '', '1er. APELLIDO / 1.ABIZENA', '2º APELLIDO / 2.ABIZENA', 'NOMBRE / IZENA',
+    'UNIVERSIDAD /UNIBERTSITATEA', 'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA',
+    'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)', 'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)',
+    'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
+  const rows = [];
+  rows.push([`PROPUESTA COMISION ${(STATE.codigoPlaza || '').toUpperCase()}`]);
+  rows.push(headers);
+  personasOrdenadasPorNumero(STATE.personas).forEach(p => {
+    rows.push([p.numero, '', (p.apellido1 || '').toUpperCase(), (p.apellido2 || '').toUpperCase(),
+      (p.nombre || '').toUpperCase(), (p.universidad || '').toUpperCase(), p.categoria, p.situacion,
+      p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  if (ws['A1']) ws['A1'].s = { font: { name: 'Calibri', sz: 11, bold: true } };
+  ws['!cols'] = [
+    { wch: 8.5 }, { wch: 8.5 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 56.5 },
+    { wch: excelAnchoAuto(rows, 6, 10, 45, 2) },  // CUERPO-CATEGORIA
+    { wch: 8.5 },
+    { wch: excelAnchoAuto(rows, 8, 8, 20, 2) },   // Área de conocimiento (código)
+    { wch: excelAnchoAuto(rows, 9, 15, 55, 2) },  // Área de conocimiento (literal)
+    { wch: 14.5 }, { wch: 8.5 },
+  ];
+  ws['!rows'] = [{ hpt: 18 }, { hpt: 101.5 }];
+  headers.forEach((_, col) => {
+    const addr = XLSX.utils.encode_cell({ r: 1, c: col });
+    if (ws[addr]) ws[addr].s = EXCEL_ESTILO_CABECERA;
+  });
+  for (let rIdx = 2; rIdx < rows.length; rIdx++) {
+    for (let cIdx = 0; cIdx < 12; cIdx++) {
+      const addr = XLSX.utils.encode_cell({ r: rIdx, c: cIdx });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      ws[addr].s = EXCEL_ESTILO_DATO;
+    }
+  }
+  XLSX.utils.book_append_sheet(wb, ws, 'Introducción de datos');
+}
+// Pestaña "Sorteo": la propuesta reordenada tras el sorteo, agrupada por bloque (Bloque A
+// primero, Bloque B después — igual que en el PDF), manteniendo dentro de cada bloque el
+// orden de extracción. "Ordenación bloques" es el número de orden original de la propuesta
+// (art. 12.1). "Sorteo" es el valor de la secuencia de bolas tal cual se introdujo en el
+// Paso 3, en la posición que le corresponde dentro de esta tabla ya agrupada por bloques —
+// confirmado con el fichero de referencia ALGORITMO_DEFINITIVO_PAD-D000040-4.csv, donde ambas
+// columnas difieren fila a fila. El DNI/NAN se muestra enmascarado, igual que en el resto de
+// exportaciones, por protección de datos.
+function construirHojaSorteo(wb, r) {
+  const headers = ['Sorteo', 'Ordenación bloques', 'DNI/NAN', '1er. APELLIDO / 1.ABIZENA', '2º APELLIDO / 2.ABIZENA',
+    'NOMBRE / IZENA', 'UNIVERSIDAD /UNIBERTSITATEA', 'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA',
+    'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)', 'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)',
+    'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
+  const rows = [headers];
+  const personasOrdenadas = [...r.listaReordenadaA, ...r.listaReordenadaB];
+  personasOrdenadas.forEach((p, i) => {
+    rows.push([r.ordenBolas[i], p.numero, maskDNI(p.dni), (p.apellido1 || '').toUpperCase(), (p.apellido2 || '').toUpperCase(),
+      (p.nombre || '').toUpperCase(), (p.universidad || '').toUpperCase(), p.categoria, p.situacion,
+      p.areaCodigo, p.areaNombre, p.perfil || '', p.sexo]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 8.5 }, { wch: 14 }, { wch: 11 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 56.5 },
+    { wch: excelAnchoAuto(rows, 7, 10, 45, 1) },  // CUERPO-CATEGORIA
+    { wch: 8.5 },
+    { wch: excelAnchoAuto(rows, 9, 8, 20, 1) },   // Área de conocimiento (código)
+    { wch: excelAnchoAuto(rows, 10, 15, 55, 1) }, // Área de conocimiento (literal)
+    { wch: 14.5 }, { wch: 8.5 },
+  ];
+  ws['!rows'] = [{ hpt: 101.5 }];
+  headers.forEach((_, col) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: col });
+    if (ws[addr]) ws[addr].s = EXCEL_ESTILO_CABECERA;
+  });
+  // Separador entre bloques: fila 10 (índice 9, la primera del Bloque B) con borde superior
+  // más grueso para diferenciarlo visualmente, tal como se ha pedido.
+  const primeraFilaBloqueB = 1 + r.listaReordenadaA.length; // índice 0-based en la hoja
+  for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+    for (let cIdx = 0; cIdx < headers.length; cIdx++) {
+      const addr = XLSX.utils.encode_cell({ r: rIdx, c: cIdx });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      if (rIdx === primeraFilaBloqueB) {
+        ws[addr].s = {
+          font: EXCEL_ESTILO_DATO.font,
+          border: { top: EXCEL_BORDE_GRUESO, bottom: EXCEL_BORDE_FINO, left: EXCEL_BORDE_FINO, right: EXCEL_BORDE_FINO },
+        };
+      } else {
+        ws[addr].s = EXCEL_ESTILO_DATO;
+      }
+    }
+  }
+  XLSX.utils.book_append_sheet(wb, ws, 'Sorteo');
 }
 /* ==========================================================================
    EXPORTACIÓN — PDF (vía vista de impresión del navegador)
