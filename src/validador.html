@@ -38,8 +38,12 @@
   .type-card.selected{border-color:var(--ink); background:var(--panel); box-shadow:0 0 0 1px var(--ink);}
   .type-card .radio-row{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
   .radio-dot{width:16px; height:16px; border-radius:50%; border:1.5px solid var(--ink-soft); flex:0 0 auto; position:relative;}
-  .type-card.selected .radio-dot{border-color:var(--ink);}
-  .type-card.selected .radio-dot::after{content:""; position:absolute; inset:3px; border-radius:50%; background:var(--ink);}
+  .type-card.selected .radio-dot,
+  .subcat-opt.selected .radio-dot,
+  .lang-option.selected .radio-dot{border-color:var(--ink);}
+  .type-card.selected .radio-dot::after,
+  .subcat-opt.selected .radio-dot::after,
+  .lang-option.selected .radio-dot::after{content:""; position:absolute; inset:3px; border-radius:50%; background:var(--ink);}
   .type-card .title{font-weight:600; font-size:14px;}
   .type-card .legend{font-size:12px; color:var(--ink-soft); line-height:1.5; padding-left:26px; font-family:'IBM Plex Mono', monospace;}
   .type-card.disabled{opacity:.45; cursor:not-allowed;}
@@ -921,7 +925,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.2</div>
+      <div class="meta-code">v1.2.2</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}
