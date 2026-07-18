@@ -6,6 +6,55 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.2] — 2026-07-18
+
+Versión de correcciones puntuales sobre reconocimiento de categorías, calidad de datos de
+la propuesta y detalles de interfaz. Sin cambios en el motor de sorteo ni en las
+exportaciones de Excel/PDF.
+
+### Fixed
+
+- Reconocimiento de categoría "Catedrático/a" incompleto: la abreviatura "CU" y la forma en
+  euskera "Katedradun"/"Katedraduna" no se reconocían como Catedrático/a, provocando que
+  propuestas de Pleno con miembros en esa categoría fallaran la validación ("no cumple la
+  categoría exigida") pese a ser correctas. Corregido añadiendo `'CU'` y `'KATEDRADUN'` a
+  `categoriasPermitidas` de `catedratico`, `pleno`, `titular` y `agregado`, y a
+  `esCatedratico()`; `esCategoria()` ahora distingue coincidencia por palabra completa
+  (abreviaturas ≤3 letras: "CU", "TU") de coincidencia por subcadena (raíces largas como
+  "KATEDRADUN"), evitando falsos positivos por coincidencia parcial. Se añadió también
+  `'TU'` como abreviatura de Titular de Universidad en `titular`/`agregado` y en
+  `esTitular()` (esta última sin llamadores activos en el resto de la aplicación,
+  actualizada por consistencia).
+- Homogeneizado `esPleno()`: usaba el stem `'PLENO'` (no reconocía la forma femenina
+  "PLENA"), mientras que `categoriasPermitidas` de `pleno` ya usaba `'PLEN'`. Ambos usan
+  ahora `'PLEN'`.
+- Filas de la propuesta con campos obligatorios vacíos (p. ej. categoría en blanco) se
+  contaban como correctas en el tamaño de bloques (17 filas, proporción 8+9) y solo
+  fallaban más adelante, en la validación de categoría, con un mensaje que no dejaba claro
+  que el problema real era un dato ausente en el Excel. Corregido con doble capa:
+  - **Fase 1** (`parseWorkbookFile`): aviso temprano, no bloqueante, por cada fila con
+    campos obligatorios vacíos (`camposFaltantes()` / `CAMPOS_OBLIGATORIOS_PROPUESTA`).
+  - **Fase 2** (`validarPropuesta`): anomalía dura y explícita ("Datos incompletos en el
+    Excel"), marcada como no excepcionable por la CPU (`excepcionable: false`): no se
+    muestra el interruptor de excepción y el sorteo permanece bloqueado
+    (`hayBloqueantes()`) hasta subsanar el Excel de origen.
+  - `situacion` se trata como opcional: si la celda viene vacía se asume `'ACTIVO'` en el
+    propio parseo, evitando un falso aviso del art. 11.9.
+  - `perfil` (perfil lingüístico) solo es obligatorio en el Bloque A (posiciones
+    1..`bloqueASize`, personal UPV/EHU); en el Bloque B (externos) su ausencia es la
+    situación habitual y ya no se marca como dato incompleto. `camposFaltantes()` recibe
+    ahora `bloqueASize` (del reglamento activo en Fase 2; valor por defecto 8 en Fase 1 si
+    el tipo de plaza aún no se ha seleccionado al cargar el Excel).
+- Radio de selección visualmente inactivo pese a estar marcada la opción (marco oscuro
+  pero punto interior vacío) al elegir subcategoría (Catedrático/Pleno/Titular/Agregado) o
+  perfil lingüístico (Bilingüe/No bilingüe). La regla CSS que rellena el punto (`::after`)
+  solo estaba definida para `.type-card.selected .radio-dot`; extendida también a
+  `.subcat-opt.selected .radio-dot` y `.lang-option.selected .radio-dot`.
+- Número de versión mostrado en cabecera ("v1.2") no reflejaba la versión real del
+  fichero; corregido a "v1.2.2".
+
+---
+
 ## [1.2.1] — 2026-07-12
 
 Versión de correcciones y ampliaciones sobre los informes y exportaciones del Paso 2 y el
