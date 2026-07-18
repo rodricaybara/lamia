@@ -187,12 +187,12 @@ const REGLAMENTOS = {
     normativaUrl: 'https://www.ehu.eus/documents/d/iip/reglamento-pdf',
     normativaLabel: 'reglamento-pdf',
     subcategorias: {
-      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC'], categoriasLabel: 'Catedrático/a', enabled: true },
-      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
-      titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'TITULAR'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
+      catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN'], categoriasLabel: 'Catedrático/a', enabled: true },
+      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
+      titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'TITULAR', 'TU'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
       // Bloque A/B admiten también las categorías laborales equiparadas a Agregado/a — ver
       // STEMS_EQUIVALENTES_AGREGADO más arriba.
-      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'PLEN', 'TITULAR', 'AGREGAD', ...STEMS_EQUIVALENTES_AGREGADO], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC) / Permanente Laboral', enabled: true },
+      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN', 'TITULAR', 'TU', 'AGREGAD', ...STEMS_EQUIVALENTES_AGREGADO], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC) / Permanente Laboral', enabled: true },
     },
   },
 };
@@ -298,6 +298,23 @@ const COLUMNAS_PROPUESTA = {
     aliases: ['sexo', 'sexo sexua', 'sexua', 'genero'],
   },
 };
+// Campos obligatorios de cada fila de la propuesta. 'situacion' es opcional: si viene
+// vacía se asume 'ACTIVO' (ver parseWorkbookFile). 'dni' y 'areaNombre' también son opcionales.
+const CAMPOS_OBLIGATORIOS_PROPUESTA = [
+  ['apellido1', 'Primer apellido'], ['nombre', 'Nombre'],
+  ['universidad', 'Universidad'], ['categoria', 'Cuerpo/Categoría'],
+  ['areaCodigo', 'Área (código)'], ['sexo', 'Sexo'],
+];
+// El perfil lingüístico solo es obligatorio en el Bloque A (posiciones 1..bloqueASize,
+// personal UPV/EHU). El Bloque B es personal externo y habitualmente no se cumplimenta
+// este campo, por lo que su ausencia ahí no debe tratarse como dato incompleto.
+const CAMPOS_OBLIGATORIOS_BLOQUE_A = [['perfil', 'Perfil lingüístico']];
+function camposFaltantes(persona, bloqueASize) {
+  const obligatorios = (persona.numero <= bloqueASize)
+    ? CAMPOS_OBLIGATORIOS_PROPUESTA.concat(CAMPOS_OBLIGATORIOS_BLOQUE_A)
+    : CAMPOS_OBLIGATORIOS_PROPUESTA;
+  return obligatorios.filter(([campo]) => !persona[campo]).map(([, label]) => label);
+}
 function crearIndiceColumnas(cabeceras) {
   const normalizadas = cabeceras.map(normalizarCabecera);
   const indices = {};
@@ -317,7 +334,7 @@ function celda(r, indices, campo) {
   const idx = indices[campo];
   return idx >= 0 ? r[idx] : '';
 }
-function parseWorkbookFile(arrayBuffer) {
+function parseWorkbookFile(arrayBuffer, bloqueASize = 8) {
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -346,7 +363,10 @@ function parseWorkbookFile(arrayBuffer) {
     const perfil = celda(r, indices, 'perfil');
     const sexo = celda(r, indices, 'sexo');
     if (numero === '' || numero === undefined) continue;
-    personas.push({
+    // 'situacion' es opcional: si no consta, se asume 'ACTIVO' (así lo indica el
+    // Vicerrectorado de PDI — a falta de dato, no se considera una anomalía de por sí).
+    const situacionNormalizada = String(situacion || '').trim().toUpperCase();
+    const persona = {
       dni: String(dni || '').trim(),
       numero: parseInt(numero, 10),
       apellido1: String(apellido1 || '').trim(),
@@ -354,12 +374,20 @@ function parseWorkbookFile(arrayBuffer) {
       nombre: String(nombre || '').trim(),
       universidad: String(universidad || '').trim(),
       categoria: String(categoria || '').trim().toUpperCase(),
-      situacion: String(situacion || '').trim().toUpperCase(),
+      situacion: situacionNormalizada || 'ACTIVO',
       areaCodigo: String(areaCodigo || '').trim(),
       areaNombre: String(areaNombre || '').trim(),
       perfil: String(perfil || '').trim().toUpperCase(),
       sexo: String(sexo || '').trim().toUpperCase(),
-    });
+    };
+    // Aviso temprano (Fase 1, no bloqueante): informa de datos obligatorios ausentes en
+    // la fila para que se detecte cuanto antes. El bloqueo real se aplica más adelante,
+    // en la validación de la propuesta (Fase 2), como anomalía no excepcionable por la CPU.
+    const faltantes = camposFaltantes(persona, bloqueASize);
+    if (faltantes.length > 0) {
+      errors.push(`Fila ${i + 1} (nº orden ${persona.numero}): faltan datos obligatorios — ${faltantes.join(', ')}. Corrige el Excel de origen.`);
+    }
+    personas.push(persona);
   }
   if (personas.length === 0) {
     errors.push('No se han detectado filas de datos a partir de la fila 3. Comprueba que el archivo sigue la plantilla estándar.');
@@ -406,16 +434,24 @@ function normalizarTexto(txt) {
 }
 function esCategoria(p, claves) {
   const c = normalizarTexto(p.categoria);
-  return claves.some(k => c.includes(k));
+  const palabras = c.split(' ');
+  return claves.some(k => {
+    // Abreviaturas cortas (CU, TU, PDC...) deben coincidir como palabra completa,
+    // para evitar falsos positivos por coincidencia parcial de subcadena.
+    if (k.length <= 3) return palabras.includes(k);
+    return c.includes(k);
+  });
 }
 function esCatedratico(p) {
-  return esCategoria(p, ['CATEDRATIC']);
+  return esCategoria(p, ['CATEDRATIC', 'CU', 'KATEDRADUN']);
 }
 function esPleno(p) {
-  return esCategoria(p, ['PLENO']);
+  // Homogeneizado con categoriasPermitidas de 'pleno' (antes usaba el stem 'PLENO',
+  // que no reconocía formas femeninas como "PLENA").
+  return esCategoria(p, ['PLEN']);
 }
 function esTitular(p) {
-  return esCategoria(p, ['TITULAR']);
+  return esCategoria(p, ['TITULAR', 'TU']);
 }
 // Catedrático o Pleno, a efectos del art. 12.4.c (40%) y del art. 13.3.b (Bloque B de Titular)
 function esCatedraticoOPleno(p) {
@@ -642,10 +678,27 @@ function validarPropuesta() {
   const personas = STATE.personas;
   const reglamento = REGLAMENTOS[STATE.tipoPlaza];
   const bilingueReq = STATE.perfilLinguistico === 'bilingue';
-  let addIssue = (id, tipo, tag, ref, desc, sugerencia, filas) => {
-    issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '', filas: filas || [] });
+  let addIssue = (id, tipo, tag, ref, desc, sugerencia, filas, excepcionable = true) => {
+    issues.push({ id, tipo, tag, ref, desc, sugerencia, cpuResuelto: false, cpuRef: '', filas: filas || [], excepcionable });
   };
   let addOk = (texto) => checksOk.push(texto);
+  // Datos incompletos: comprobación dura, no excepcionable por la CPU. Si falta algún
+  // campo obligatorio en alguna fila, el sorteo queda bloqueado hasta subsanar el Excel
+  // (ver también el aviso temprano, no bloqueante, en la Fase 1 / parseWorkbookFile).
+  const personasIncompletas = personas
+    .map(p => ({ p, faltantes: camposFaltantes(p, reglamento.bloqueASize) }))
+    .filter(x => x.faltantes.length > 0);
+  if (personasIncompletas.length === 0) {
+    addOk('Datos obligatorios: todas las filas tienen cumplimentados los campos requeridos.');
+  } else {
+    const detalle = personasIncompletas
+      .map(({ p, faltantes }) => `fila nº ${p.numero || '—'}${nombreCompleto(p) ? ' (' + nombreCompleto(p) + ')' : ''}: falta ${faltantes.join(', ')}`)
+      .join(' · ');
+    addIssue('datos-incompletos', 'error', 'Datos incompletos en el Excel', '—',
+      `Hay ${personasIncompletas.length} fila(s) con campos obligatorios vacíos — ${detalle}.`,
+      'Corrige el Excel de origen y vuelve a cargarlo. Esta anomalía no admite excepción CPU.',
+      personasIncompletas.map(x => x.p.numero), false);
+  }
   const nums = personas.map(p => p.numero).sort((a, b) => a - b);
   const esperados = Array.from({ length: 17 }, (_, i) => i + 1);
   const numsOk = nums.length === 17 && esperados.every((v, i) => nums[i] === v);
@@ -1114,9 +1167,15 @@ function renderPaso2() {
   </section>`;
 }
 function renderIssueCard(issue) {
+  const noExcepcionable = issue.tipo === 'error' && issue.excepcionable === false;
   const cls = issue.tipo === 'warn' ? 'issue warn' : (issue.cpuResuelto ? 'issue resolved' : 'issue');
   const tagText = issue.cpuResuelto ? `Excepción CPU · ${issue.tag}` : (issue.tipo === 'warn' ? issue.tag : `Anomalía · ${issue.tag}`);
-  const cpuBlock = issue.tipo === 'error' ? `
+  const cpuBlock = noExcepcionable ? `
+    <div class="cpu-toggle">
+      <div class="cpu-toggle-row" style="opacity:.8;cursor:default;">
+        <span style="color:#b00020;font-weight:600;">⚠ Debe subsanarse el Excel de origen. Esta anomalía no puede aceptarse como excepción CPU.</span>
+      </div>
+    </div>` : (issue.tipo === 'error' ? `
     <div class="cpu-toggle">
       <div class="cpu-toggle-row" onclick="toggleCPU('${issue.id}')">
         <span class="switch ${issue.cpuResuelto ? 'on' : ''}"></span>
@@ -1126,7 +1185,7 @@ function renderIssueCard(issue) {
         <span>Ref.:</span>
         <input type="text" data-cpu-ref="${issue.id}" value="${issue.cpuRef}" placeholder="Introduce nº de acta / referencia CPU…" ${issue.cpuResuelto ? '' : 'disabled'}>
       </div>
-    </div>` : '';
+    </div>` : '');
   return `
   <div class="${cls}">
     <div class="head"><span class="tag">${tagText}</span><span class="ref">${issue.ref}</span></div>
@@ -1137,6 +1196,7 @@ function renderIssueCard(issue) {
 }
 function toggleCPU(id) {
   const issue = STATE.issues.find(i => i.id === id);
+  if (!issue || issue.excepcionable === false) return; // no admite excepción CPU
   issue.cpuResuelto = !issue.cpuResuelto;
   render();
 }
@@ -1311,7 +1371,9 @@ function handleFile(file) {
   reader.onload = (e) => {
     try {
       const data = new Uint8Array(e.target.result);
-      const { titulo, codigoDetectado, personas, errors } = parseWorkbookFile(data);
+      const reglamentoActual = REGLAMENTOS[STATE.tipoPlaza];
+      const bloqueASizeActual = reglamentoActual ? reglamentoActual.bloqueASize : 8;
+      const { titulo, codigoDetectado, personas, errors } = parseWorkbookFile(data, bloqueASizeActual);
       STATE.tituloExcel = titulo;
       STATE.codigoPlazaExcel = codigoDetectado;
       STATE.personas = personas;
