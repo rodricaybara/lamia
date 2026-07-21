@@ -192,11 +192,11 @@ const REGLAMENTOS = {
     normativaLabel: 'reglamento-pdf',
     subcategorias: {
       catedratico: { label: 'Catedrático/a', categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN'], categoriasLabel: 'Catedrático/a', enabled: true },
-      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
+      pleno:       { label: 'Pleno',          categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN', 'PL'], categoriasLabel: 'Catedrático/a o Profesor/a Pleno', enabled: true },
       titular:     { label: 'Titular',        categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'TITULAR', 'TU'], categoriasLabel: 'Catedrático/a o Titular de Universidad', enabled: true },
       // Bloque A/B admiten también las categorías laborales equiparadas a Agregado/a — ver
       // STEMS_EQUIVALENTES_AGREGADO más arriba.
-      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN', 'TITULAR', 'TU', 'AGREGAD', ...STEMS_EQUIVALENTES_AGREGADO], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC) / Permanente Laboral', enabled: true },
+      agregado:    { label: 'Agregado',       categoriasPermitidas: ['CATEDRATIC', 'CU', 'KATEDRADUN', 'PLEN', 'PL', 'TITULAR', 'TU', 'AGREGAD', 'AG', 'AGREGATU', ...STEMS_EQUIVALENTES_AGREGADO], categoriasLabel: 'Catedrático/a, Profesor/a Pleno, Titular de Universidad, Agregado/a o Profesor/a Contratado/a Doctor/a (PDC) / Permanente Laboral', enabled: true },
     },
   },
 };
@@ -452,7 +452,9 @@ function esCatedratico(p) {
 function esPleno(p) {
   // Homogeneizado con categoriasPermitidas de 'pleno' (antes usaba el stem 'PLENO',
   // que no reconocía formas femeninas como "PLENA").
-  return esCategoria(p, ['PLEN']);
+  // 'PL' es la abreviatura corta usada en las plantillas de propuesta y debe
+  // coincidir como palabra completa (ver esCategoria) para evitar falsos positivos.
+  return esCategoria(p, ['PLEN', 'PL']);
 }
 function esTitular(p) {
   return esCategoria(p, ['TITULAR', 'TU']);
@@ -807,7 +809,7 @@ function validarPropuesta() {
   }
   const equivalenciasCategoria = [];
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const stemsAdmitidos = ['CATEDRATIC', 'TITULAR', ...STEMS_EQUIVALENTES_AGREGADO];
+    const stemsAdmitidos = ['CATEDRATIC', 'CU', 'TITULAR', 'TU', ...STEMS_EQUIVALENTES_AGREGADO];
     const noValidos = bloqueB.filter(p => !esCategoria(p, stemsAdmitidos));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad — art. 3.1.b.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
@@ -925,7 +927,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.2.2</div>
+      <div class="meta-code">v1.2.4</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}

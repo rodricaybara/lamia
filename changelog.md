@@ -6,6 +6,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.4] - 2026-07-21
+
+### Fixed
+- **Detección de categoría "Agregado/a" en euskera**: la forma "Agregatua" no se reconocía como categoría válida en la subcategoría Agregado del Acuerdo 26/09/2024, al no coincidir con el stem `AGREGAD` existente. Se añade el stem `AGREGATU` a `categoriasPermitidas` de `agregado`.
+  - Verificado que "Titularra" (euskara) ya se detectaba correctamente sin cambios, al contener `TITULAR` como subcadena.
+
+## [1.2.3] - 2026-07-21
+
+### Fixed
+- **Detección de abreviaturas cortas de categoría** (`CU`, `TU`, `PL`, `AG`), no reconocidas de forma consistente en varios puntos del motor:
+  1. `esPleno()` (función global, usada también por el motor de sorteo vía `esCatedraticoOPleno` en el art. 13.3.b) → ahora reconoce `PL` además de `PLEN`.
+  2. `categoriasPermitidas` de `pleno` (Acuerdo 26/09/2024) → añadida `PL`.
+  3. `categoriasPermitidas` de `agregado` (Acuerdo 26/09/2024) → añadidas `PL` y `AG`.
+  4. Bloque B de Ayudante Doctor, art. 3.1.b (línea 812) → añadidas `CU` y `TU`. Este era el bug concreto que afectaba a la propuesta PAD-310-20: las 9 personas del Bloque B, todas con categoría "TU", salían marcadas incorrectamente como categoría no válida.
+
 ## [1.2.2] — 2026-07-18
 
 Versión de correcciones puntuales sobre reconocimiento de categorías, calidad de datos de
