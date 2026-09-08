@@ -6,6 +6,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.5] - 2026-09-08
+
+### Fixed
+- **Perfil lingüístico "Elebidun"/"Elebiduna" (euskera) no reconocido como bilingüe**: `isBilingue()` solo comparaba por igualdad exacta contra `BILINGUE`/`TRILINGUE`, sin contemplar la forma en euskera. Corregido añadiendo una comprobación adicional por prefijo (`startsWith('ELEBIDUN')`), que cubre tanto "Elebidun" como "Elebiduna" sin necesidad de listar cada variante de género.
+- **Detección de "Katedraduna" (euskera) como Catedrático/a en Bloque B de Ayudante Doctor**: el stem `KATEDRADUN` ya se reconocía en `esCatedratico()` y en `categoriasPermitidas` de las subcategorías del Acuerdo 26/09/2024 (desde v1.2.2), pero no se había propagado al array `stemsAdmitidos` del art. 3.1.b (línea ~812), usado específicamente para validar el Bloque B de convocatorias de Profesorado Ayudante Doctor. Miembros externos con categoría "Katedraduna" en ese reglamento salían marcados incorrectamente como categoría no válida. Añadido `KATEDRADUN` a dicho array.
+- **Detección de "Irakasle Agregatua" (euskera) como Agregado/a**: no coincidía con ningún stem de `STEMS_EQUIVALENTES_AGREGADO` (hasta ahora limitado a las equivalencias administrativas en castellano: PDC, Contratado/a Doctor/a, Laboral Permanente). Añadido el stem `AGREGATU`. Al reutilizarse esta misma constante en dos puntos del motor, la corrección se aplica de forma consistente tanto a la subcategoría Agregado del Acuerdo 26/09/2024 (art. 12.4) como al Bloque B de Ayudante Doctor (art. 3.1.b, donde Agregado se admite como equivalente a Titular de Universidad).
+- Número de versión mostrado en cabecera actualizado a "v1.2.5".
+
 ## [1.2.4] - 2026-07-21
 
 ### Fixed

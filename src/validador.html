@@ -169,7 +169,7 @@
 // pero corresponden a la misma figura — ver conversación con Fernando (Vicerrectorado de PDI).
 const STEMS_EQUIVALENTES_AGREGADO = [
   'CONTRATADO DOCTOR', 'CONTRATADA DOCTORA', 'PDC',
-  'LABORAL PERMANENTE', 'PERMANENTE LABORAL',
+  'LABORAL PERMANENTE', 'PERMANENTE LABORAL', 'AGREGATU',
 ];
 const REGLAMENTOS = {
   ayudante_doctor: {
@@ -259,7 +259,7 @@ const COLUMNAS_PROPUESTA = {
   },
   numero: {
     fallback: 1,
-    aliases: ['n', 'no', 'num', 'numero', 'n orden', 'numero orden', 'orden'],
+    aliases: ['n', 'no', 'num', 'numero', 'n orden', 'numero orden', 'orden', 'n zk'],
   },
   apellido1: {
     fallback: 2,
@@ -420,7 +420,8 @@ function isBilingue(perfil) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .trim();
-  return p === 'BILINGUE' || p === 'TRILINGUE';
+  // 'ELEBIDUN'/'ELEBIDUNA' (euskera: bilingüe) — formas equivalentes a BILINGUE/TRILINGUE.
+  return p === 'BILINGUE' || p === 'TRILINGUE' || p.startsWith('ELEBIDUN');
 }
 function maskDNI(dni) {
   if (!dni || dni.length < 4) return '••••••••';
@@ -809,7 +810,7 @@ function validarPropuesta() {
   }
   const equivalenciasCategoria = [];
   if (STATE.tipoPlaza === 'ayudante_doctor') {
-    const stemsAdmitidos = ['CATEDRATIC', 'CU', 'TITULAR', 'TU', ...STEMS_EQUIVALENTES_AGREGADO];
+    const stemsAdmitidos = ['CATEDRATIC', 'CU', 'KATEDRADUN', 'TITULAR', 'TU', ...STEMS_EQUIVALENTES_AGREGADO];
     const noValidos = bloqueB.filter(p => !esCategoria(p, stemsAdmitidos));
     if (noValidos.length === 0) addOk('Categorías del Bloque B: todas equiparables a Catedrático/a o Titular de Universidad — art. 3.1.b.');
     else noValidos.forEach(p => addIssue(`cat-${p.numero}`, 'error', 'Categoría no válida', 'art. 3.1.b',
@@ -927,7 +928,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.2.4</div>
+      <div class="meta-code">v1.2.5</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}
