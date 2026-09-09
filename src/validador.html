@@ -928,7 +928,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.2.5</div>
+      <div class="meta-code">v1.2.6</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}
@@ -1338,7 +1338,8 @@ function renderResultadoSorteo() {
     <div class="export-row">
       <span class="stamp-note">Acta de composición de la Comisión, con la traza completa del procedimiento, lista para incorporar al expediente.</span>
       <div class="btn-row">
-        <button class="btn secondary" onclick="exportarActaExcel()">↓ Exportar a Excel</button>
+        <button class="btn secondary" onclick="exportarActaExcel()">↓ Exportar datos Excel</button>
+        <button class="btn secondary" onclick="exportarComposicionExcel()">↓ Exportar Composicion Excel</button>
         <button class="btn secondary" onclick="exportarActaPDF()">↓ Exportar a PDF (acta)</button>
       </div>
     </div>`;
@@ -1502,6 +1503,24 @@ function exportarActaExcel() {
   if (!r) return;
   const wb = XLSX.utils.book_new();
   construirHojaIntroduccionDatos(wb);
+  construirHojaComposicion(wb, r);
+  construirHojaSorteo(wb, r);
+  XLSX.writeFile(wb, `Datos_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
+}
+// Exportación reducida: únicamente la pestaña "Composición" (composición final de
+// titulares/suplentes), sin "Introducción de datos" ni "Sorteo". Reutiliza
+// construirHojaComposicion para garantizar formato idéntico al de la exportación completa.
+function exportarComposicionExcel() {
+  const r = STATE.resultado;
+  if (!r) return;
+  const wb = XLSX.utils.book_new();
+  construirHojaComposicion(wb, r);
+  XLSX.writeFile(wb, `Composicion_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
+}
+// Pestaña "Composición": composición final de la comisión (titulares y suplentes),
+// tal como queda tras aplicar el algoritmo de sorteo. Compartida por exportarActaExcel()
+// (dentro del libro completo) y exportarComposicionExcel() (libro solo con esta pestaña).
+function construirHojaComposicion(wb, r) {
   const headers = ['CODIGO', 'Número', 'NOMBRE Y APELLIDOS', 'FUNCION TRIBUNAL', 'UNIVERSIDAD',
     'CUERPO- CATEGORIA /KIDEGOA-KATEGORIA', 'SITUACION /EGOERA', 'AREA CONOCIMIENTO (CÓDIGO) /JAKINTZA ARLOA (KODEA)',
     'AREA CONOCIMIENTO (LITERAL) / JAKINTZA ARLOA (LITERALA)', 'PERFIL LINGÜÍSTICO /HIZKUNTZ EZKAKIZUNA', 'SEXO / SEXUA'];
@@ -1545,8 +1564,6 @@ function exportarActaExcel() {
     }
   }
   XLSX.utils.book_append_sheet(wb, ws, 'Composición');
-  construirHojaSorteo(wb, r);
-  XLSX.writeFile(wb, `Composicion_comision_${STATE.codigoPlaza || 'plaza'}.xlsx`);
 }
 // Pestaña "Introducción de datos": la propuesta tal como la mandó el Departamento,
 // en su numeración original (antes del sorteo). Columna B intencionadamente en blanco
@@ -1710,6 +1727,7 @@ function exportarActaPDF() {
       <td>${p.categoria}</td><td>${p.perfil || '—'}</td><td>${p.sexo}</td></tr>`;
   }
   let body = `<h1>Composición Comisión de Selección — Plaza ${STATE.codigoPlaza}</h1>`;
+  body += `<p><b>Perfil lingüístico:</b> ${STATE.perfilLinguistico === 'bilingue' ? 'Bilingüe' : 'No bilingüe'}</p>`;
   body += `<table><thead><tr><th>Código</th><th>Nº</th><th>Nombre y apellidos</th><th>Función</th>
     <th>Universidad</th><th>Cuerpo-Categoría</th><th>Situación</th><th>Área (cód.)</th><th>Área (literal)</th><th>Perfil ling.</th><th>Sexo</th></tr></thead><tbody>`;
   body += r.titulares.map(p => fila(p, true)).join('');

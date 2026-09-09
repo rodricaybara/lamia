@@ -6,6 +6,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ---
 
+## [1.2.6] - 2026-09-09
+
+### Added
+- **Nuevo botón "Exportar Composicion Excel" en el Paso 3 (Sorteo y composición)**: exporta únicamente la pestaña "Composición" (composición final de titulares/suplentes), sin las pestañas "Introducción de datos" ni "Sorteo". Nueva función `exportarComposicionExcel()`, genera `Composicion_comision_${STATE.codigoPlaza}.xlsx`.
+- **Perfil lingüístico en el acta PDF**: `exportarActaPDF()` añade una línea "Perfil lingüístico: Bilingüe / No bilingüe" justo debajo del título "Composición Comisión de Selección — Plaza XXXX", usando `STATE.perfilLinguistico`.
+
+### Changed
+- **Refactor de `exportarActaExcel()`**: la construcción de la pestaña "Composición" se extrae a la función `construirHojaComposicion(wb, r)`, reutilizada ahora tanto por `exportarActaExcel()` (libro completo de 3 pestañas) como por `exportarComposicionExcel()` (libro solo con esta pestaña). Sin cambios de formato ni de contenido respecto a v1.2.5.
+- **Nombres de fichero de exportación Excel del Paso 3 renombrados** para diferenciar ambos botones:
+  - Botón "Exportar datos Excel" (antes "Exportar a Excel", libro completo con las 3 pestañas): pasa de `Composicion_comision_${STATE.codigoPlaza}.xlsx` a `Datos_comision_${STATE.codigoPlaza}.xlsx`.
+  - Botón nuevo "Exportar Composicion Excel" (solo pestaña "Composición"): usa el nombre que tenía antes el botón completo, `Composicion_comision_${STATE.codigoPlaza}.xlsx`.
+- Número de versión mostrado en cabecera actualizado a "v1.2.6".
+
 ## [1.2.5] - 2026-09-08
 
 ### Fixed
