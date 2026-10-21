@@ -214,6 +214,7 @@ const STATE = {
   perfilLinguistico: 'bilingue', // 'no_bilingue' | 'bilingue'
   areaFuertementeFeminizada: false,
   criterio40Estricto: false, // art. 12.4.c/d (Titular/Agregado): false = redondeo a la baja (costumbre), true = redondeo al alza (estricto)
+  aplicar133bAgregado: false, // Bloque B de Agregado: false = alternancia de sexos (art. 13.3.a, criterio actual), true = se asimila a Titular (art. 13.3.b)
   personas: [],             // filas parseadas del Excel
   parseErrors: [],
   fileName: '',
@@ -578,7 +579,7 @@ function bloqueB_alternando(listaReordenada, nTotal, reglaRef, traza) {
   return { titulares: seleccion.slice(0, 3), suplentes: seleccion.slice(3, 6) };
 }
 function bloqueB_titular(listaReordenada, traza) {
-  // art. 13.3.b — específico de Titular y Agregado.
+  // art. 13.3.b — específico de Titular (Agregado y Pleno usan la alternancia simple, art. 13.3.a).
   // Se aplica de forma estricta: la exigencia de categoría (Catedrático/Pleno)
   // prevalece sobre la alternancia de género cuando ambas entran en conflicto.
   const externos = listaReordenada.filter(p => !isUPV(p.universidad));
@@ -598,8 +599,21 @@ function bloqueB_titular(listaReordenada, traza) {
     generoAnterior = p.sexo;
     traza.push({ bloque: 'B', regla, texto: `${texto} → <b>${nombreCompleto(p)}</b>.` });
   }
+  // Pasos en los que el art. 13.3.b obliga a elegir una persona Catedrático/Pleno. Si ya no
+  // quedan (p. ej. porque la CPU ha aprobado una excepción con menos Catedráticos/Pleno de los
+  // habituales), no se puede cumplir el mínimo: se elige a la primera persona restante de género
+  // distinto (aunque no sea Catedrático/Pleno), se deja constancia en la traza y se devuelve una
+  // anomalía para mostrarla en el resultado y en el acta.
+  const fallos = [];
+  function elegirCP(regla, texto, etiquetaPaso, exigencia) {
+    const cp = pickCP();
+    if (cp) { elegir(cp, regla, texto); return; }
+    fallos.push(etiquetaPaso);
+    elegir(pickDistintoGenero(generoAnterior), regla,
+      `⚠ Anomalía: no quedan personas de categoría Catedrático/Pleno para ${exigencia}; se selecciona la primera persona restante de género distinto`);
+  }
   // 1ª persona: primera de la lista de categoría Catedrático/Pleno (art. 13.3.b.a)
-  elegir(pickCP(), 'art. 13.3.b', 'Primera persona externa de categoría Catedrático/Pleno');
+  elegirCP('art. 13.3.b', 'Primera persona externa de categoría Catedrático/Pleno', '1ª elección', 'la primera elección');
   // 2ª persona: siguiente de género distinto
   elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'A continuación, primera persona de género distinto');
   // Si tras esto hay más de una persona Catedrático/Pleno en el tribunal titular (primeras 3),
@@ -609,24 +623,34 @@ function bloqueB_titular(listaReordenada, traza) {
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'Continúa la alternancia de género (ya hay más de una persona Catedrático/Pleno en el tribunal titular)');
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'Continúa la alternancia de género');
   } else {
-    elegir(pickCP(), 'art. 13.3.b', 'Refuerzo: primera persona restante de categoría Catedrático/Pleno');
+    elegirCP('art. 13.3.b', 'Refuerzo: primera persona restante de categoría Catedrático/Pleno', 'refuerzo', 'el refuerzo');
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b', 'A continuación, primera persona de género distinto');
   }
   // 5ª persona: debe garantizar al menos 3 personas Catedrático/Pleno en el conjunto final (6 personas)
   let cpCount = seleccion.filter(esCatedraticoOPleno).length;
   if (cpCount < 3) {
-    elegir(pickCP(), 'art. 13.3.b (5ª)', 'Se fuerza una persona de categoría Catedrático/Pleno para garantizar el mínimo de 3 exigido');
+    elegirCP('art. 13.3.b (5ª)', 'Se fuerza una persona de categoría Catedrático/Pleno para garantizar el mínimo de 3 exigido', '5ª elección', 'garantizar el mínimo de 3 exigido');
   } else {
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b (5ª)', 'Continúa la alternancia de género (ya se garantizan 3 personas Catedrático/Pleno)');
   }
   // 6ª persona: debe garantizar al menos 4 personas Catedrático/Pleno en el conjunto final
   cpCount = seleccion.filter(esCatedraticoOPleno).length;
   if (cpCount < 4) {
-    elegir(pickCP(), 'art. 13.3.b (6ª)', 'Se fuerza una persona de categoría Catedrático/Pleno para garantizar el mínimo de 4 exigido');
+    elegirCP('art. 13.3.b (6ª)', 'Se fuerza una persona de categoría Catedrático/Pleno para garantizar el mínimo de 4 exigido', '6ª elección', 'garantizar el mínimo de 4 exigido');
   } else {
     elegir(pickDistintoGenero(generoAnterior), 'art. 13.3.b (6ª)', 'Continúa la alternancia de género (ya se garantizan 4 personas Catedrático/Pleno)');
   }
-  return { titulares: seleccion.slice(0, 3), suplentes: seleccion.slice(3, 6) };
+  const anomalias = [];
+  if (fallos.length) {
+    const totalCP = externos.filter(esCatedraticoOPleno).length;
+    const cpFinal = seleccion.filter(esCatedraticoOPleno).length;
+    anomalias.push(
+      `El art. 13.3.b exige que el conjunto de seis personas del Bloque B incluya al menos 3 Catedrático/Pleno tras la 5ª elección y 4 tras la 6ª, ` +
+      `pero la propuesta solo cuenta con ${totalCP} persona${totalCP === 1 ? '' : 's'} Catedrático/Pleno en el Bloque B ` +
+      `(${cpFinal} en la composición final). No se ha podido forzar la categoría en: ${fallos.join(', ')}; en esos pasos se ha seleccionado ` +
+      `a una persona que no es Catedrático/Pleno, siguiendo la alternancia de sexos. Revisar si procede (p. ej., excepción aprobada por la CPU en la propuesta).`);
+  }
+  return { titulares: seleccion.slice(0, 3), suplentes: seleccion.slice(3, 6), anomalias };
 }
 function describePareja(pareja, bilingueReq, segundoNoUPV, etiqueta) {
   if (pareja.length === 0) return `${etiqueta}: no ha sido posible completar la selección (lista insuficiente).`;
@@ -642,8 +666,34 @@ function describePareja(pareja, bilingueReq, segundoNoUPV, etiqueta) {
   }
   return txt;
 }
-function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bilingue) {
+// Nota aclaratoria sobre el criterio aplicado en el Bloque B (Acuerdo 26/09/2024), que
+// debe constar en pantalla y en el acta. El art. 13.3 regula expresamente Catedrático
+// (13.3.a) y Titular (13.3.b), pero no Pleno ni Agregado. Devuelve texto plano (se reutiliza
+// en pantalla, acta PDF y acta Excel) o null si la subcategoría está regulada expresamente.
+function notaCriterioBloqueB(subcategoria, usa133b) {
+  if (subcategoria === 'pleno') {
+    return 'A día de hoy no está regulada expresamente la composición del Bloque B en las plazas de Profesorado Pleno. ' +
+      'Se aplica el criterio del art. 13.3.a (alternancia de sexos), bien por aplicarse directamente la alternancia de sexos, ' +
+      'bien por asimilar las plazas de Pleno a las de Catedrático.';
+  }
+  if (subcategoria === 'agregado') {
+    return usa133b
+      ? 'A día de hoy no está regulada expresamente la composición del Bloque B en las plazas de Profesorado Agregado. ' +
+        'Por interpretación, se asimila la plaza de Agregado a la de Titular y se aplica el criterio del art. 13.3.b ' +
+        '(prioridad de la categoría Catedrático/Pleno sobre la alternancia de sexos: mínimo de tres personas Catedrático/Pleno ' +
+        'tras la 5ª elección y de cuatro tras la 6ª).'
+      : 'A día de hoy no está regulada expresamente la composición del Bloque B en las plazas de Profesorado Agregado. ' +
+        'Se aplica el criterio del art. 13.3.a (alternancia de sexos). No se ha aplicado el art. 13.3.b ' +
+        '(prioridad de categoría Catedrático/Pleno), previsto para las plazas de Titular.';
+  }
+  return null;
+}
+// opciones.aplicar133b: solo tiene efecto en Agregado (interpretación: se asimila a Titular).
+// En Pleno no tiene efecto (todo su Bloque B es Catedrático/Pleno) y en Titular el art. 13.3.b
+// se aplica siempre.
+function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bilingue, opciones = {}) {
   const traza = [];
+  let usa133b = false;
   const listaReordenada = reordenar(personas, ordenBolas);
   const reglamento = REGLAMENTOS[tipoPlaza];
   // El sorteo se realiza con una única secuencia de 17 bolas, pero cada bloque se
@@ -658,7 +708,11 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
     b = bloqueB_alternando(listaReordenadaB, 6, 'art. 4.3', traza);
   } else {
     a = bloqueA_Acuerdo2024(listaReordenadaA, subcategoria, bilingue, traza);
-    if (subcategoria === 'titular' || subcategoria === 'agregado') {
+    // art. 13.3.b es propio de Titular. Para Catedrático y Pleno (y, por defecto, Agregado) se
+    // aplica la alternancia simple de sexo del art. 13.3.a. Solo en Agregado puede activarse,
+    // por interpretación (se asimila a Titular), el art. 13.3.b (criterio del Vicerrectorado de PDI).
+    usa133b = subcategoria === 'titular' || (subcategoria === 'agregado' && opciones.aplicar133b === true);
+    if (usa133b) {
       b = bloqueB_titular(listaReordenadaB, traza);
     } else {
       b = bloqueB_alternando(listaReordenadaB, 6, 'art. 13.3.a', traza);
@@ -672,6 +726,9 @@ function calcularComposicion(personas, ordenBolas, tipoPlaza, subcategoria, bili
     titulares: [...a.titulares, ...b.titulares],
     suplentes: [...a.suplentes, ...b.suplentes],
     traza,
+    reglaBloqueB: tipoPlaza === 'ayudante_doctor' ? 'art. 4.3' : (usa133b ? 'art. 13.3.b' : 'art. 13.3.a'),
+    anomaliasB: b.anomalias || [],
+    notaCriterioB: tipoPlaza === 'acuerdo2024' ? notaCriterioBloqueB(subcategoria, usa133b) : null,
   };
 }
 </script>
@@ -928,7 +985,7 @@ function render() {
         <span class="eyebrow">UPV/EHU · Vicerrectorado de PDI</span>
         <h1>Validador de propuestas de Comisión</h1>
       </div>
-      <div class="meta-code">v1.2.6</div>
+      <div class="meta-code">v1.2.8</div>
     </header>
     ${renderStepsBar()}
     ${STATE.step === 1 ? renderPaso1() : ''}
@@ -1261,6 +1318,19 @@ function renderPaso3() {
         <div class="head"><span class="tag">Error de validación</span></div>
         <div class="desc" style="margin-bottom:0;">${check.errores.join(' ')} Corrige la secuencia antes de continuar.</div>
       </div>` : ''}
+      ${(STATE.tipoPlaza === 'acuerdo2024' && STATE.subcategoria === 'agregado') ? `
+      <div class="cpu-toggle" style="margin-top:18px;">
+        <div class="cpu-toggle-row" onclick="toggleCriterio133b()">
+          <span class="switch ${STATE.aplicar133bAgregado ? 'on' : ''}"></span>
+          <span class="cpu-toggle-label">Aplicar el art. 13.3.b al Bloque B (asimilar Agregado a Titular)</span>
+        </div>
+        <p style="font-size:12px; color:var(--ink-soft); margin:2px 0 0 44px;">
+          El art. 13.3 no regula expresamente el Bloque B de las plazas de Agregado. Con la opción desactivada (criterio
+          actual) se aplica la alternancia de sexos del art. 13.3.a. Activada, se interpreta que Agregado se asimila a
+          Titular y se aplica el art. 13.3.b (prioridad de categoría Catedrático/Pleno sobre la alternancia de sexos).
+          El criterio aplicado constará en el acta.
+        </p>
+      </div>` : ''}
       <div class="btn-row" style="margin-top:16px;">
         <button class="btn" ${(check.valido && !bloqueantes) ? '' : 'disabled'} onclick="calcularYMostrar()">Calcular composición ▸</button>
       </div>
@@ -1303,7 +1373,15 @@ function renderResultadoSorteo() {
   return `
     <h3 style="font-family:'Source Serif 4', serif; font-size:15px; margin:26px 0 4px;">Traza del procedimiento</h3>
     <p class="sub2" style="margin-bottom:0;">Lógica aplicada paso a paso conforme al ${reglaLabel}.</p>
-    ${(STATE.subcategoria === 'titular' || STATE.subcategoria === 'agregado') ? `
+    ${(r.anomaliasB || []).map(a => `
+    <div class="banner-warn2" style="margin-top:10px;">
+      ⚠ <span><b>Anomalía en la composición del Bloque B.</b> ${a}</span>
+    </div>`).join('')}
+    ${r.notaCriterioB ? `
+    <div class="banner-warn2" style="margin-top:10px;">
+      ℹ <span><b>Criterio aplicado en el Bloque B.</b> ${r.notaCriterioB}</span>
+    </div>` : ''}
+    ${r.reglaBloqueB === 'art. 13.3.b' ? `
     <div class="banner-warn2" style="margin-top:10px;">
       ℹ <span>Los pasos marcados como <b>"forzado CP"</b> o <b>"refuerzo"</b> en el Bloque B derivan directamente del
       art. 13.3.b, que exige literalmente un mínimo de <b>tres</b> personas Catedrático/Pleno tras la 5ª elección y de
@@ -1347,7 +1425,8 @@ function renderResultadoSorteo() {
 function calcularYMostrar() {
   const check = validarBolas();
   if (!check.valido || hayBloqueantes()) { render(); return; }
-  STATE.resultado = calcularComposicion(STATE.personas, check.nums, STATE.tipoPlaza, STATE.subcategoria, STATE.perfilLinguistico === 'bilingue');
+  STATE.resultado = calcularComposicion(STATE.personas, check.nums, STATE.tipoPlaza, STATE.subcategoria, STATE.perfilLinguistico === 'bilingue',
+    { aplicar133b: STATE.aplicar133bAgregado });
   render();
 }
 </script>
@@ -1358,9 +1437,13 @@ function calcularYMostrar() {
 function setTipoPlaza(tipo) {
   STATE.tipoPlaza = tipo;
   STATE.subcategoria = tipo === 'acuerdo2024' ? null : null;
+  STATE.aplicar133bAgregado = false;
   render();
 }
-function setSubcategoria(sub) { STATE.subcategoria = sub; render(); }
+function setSubcategoria(sub) { STATE.subcategoria = sub; STATE.aplicar133bAgregado = false; render(); }
+// Al cambiar el criterio se descarta el resultado ya calculado, para que ni la pantalla
+// ni las exportaciones muestren una composición obtenida con el criterio anterior.
+function toggleCriterio133b() { STATE.aplicar133bAgregado = !STATE.aplicar133bAgregado; STATE.resultado = null; render(); }
 function setPerfil(p) { STATE.perfilLinguistico = p; render(); }
 function toggleFeminizada() { STATE.areaFuertementeFeminizada = !STATE.areaFuertementeFeminizada; render(); }
 function toggleCriterio40() { STATE.criterio40Estricto = !STATE.criterio40Estricto; validarPropuesta(); render(); }
@@ -1563,6 +1646,19 @@ function construirHojaComposicion(wb, r) {
       ws[addr].s = estiloFila;
     }
   }
+  // Notas al pie, tras una fila en blanco: criterio aplicado en el Bloque B (Pleno y Agregado)
+  // y anomalías de la composición (p. ej. mínimo de Catedrático/Pleno del art. 13.3.b no alcanzable).
+  const notasPie = [];
+  if (r.notaCriterioB) notasPie.push('Criterio aplicado en el Bloque B: ' + r.notaCriterioB);
+  (r.anomaliasB || []).forEach(a => notasPie.push('ANOMALÍA en la composición: ' + a));
+  notasPie.forEach((texto, i) => {
+    const filaNota = rows.length + 1 + i;
+    XLSX.utils.sheet_add_aoa(ws, [[texto]], { origin: { r: filaNota, c: 0 } });
+    ws['!merges'].push({ s: { r: filaNota, c: 0 }, e: { r: filaNota, c: 10 } });
+    ws['A' + (filaNota + 1)].s = { font: { name: 'Calibri', sz: 10, italic: true, bold: texto.startsWith('ANOMALÍA') }, alignment: { wrapText: true, vertical: 'top' } };
+    for (let k = ws['!rows'].length; k < filaNota; k++) ws['!rows'][k] = {};
+    ws['!rows'][filaNota] = { hpt: texto.length > 330 ? 78 : 48 };
+  });
   XLSX.utils.book_append_sheet(wb, ws, 'Composición');
 }
 // Pestaña "Introducción de datos": la propuesta tal como la mandó el Departamento,
@@ -1734,6 +1830,12 @@ function exportarActaPDF() {
   body += `<tr class="sep"><td colspan="11"></td></tr>`;
   body += r.suplentes.map(p => fila(p, false)).join('');
   body += `</tbody></table>`;
+  if (r.notaCriterioB) {
+    body += `<h2>Criterio aplicado en el Bloque B</h2><p>${r.notaCriterioB}</p>`;
+  }
+  if ((r.anomaliasB || []).length) {
+    body += `<h2>Anomalías en la composición</h2>${r.anomaliasB.map(a => `<p>⚠ ${a}</p>`).join('')}`;
+  }
   body += `<h2>Traza del procedimiento</h2><ol>${r.traza.map(t => `<li><b>Bloque ${t.bloque}</b> (${t.regla}) — ${t.texto}</li>`).join('')}</ol>`;
   body += `<h2>Orden del sorteo</h2>`;
   body += `<p>${r.listaReordenada.map(p => p.numero).join(' → ')}</p>`;
